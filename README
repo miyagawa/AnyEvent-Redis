@@ -1,11 +1,24 @@
 NAME
-    AnyEvent::Redis -
+    AnyEvent::Redis - Non-blocking Redis client
 
 SYNOPSIS
       use AnyEvent::Redis;
 
+      my $redis = redis_client '127.0.0.1:6379';
+
+      # callback based
+      $redis->set( 'foo'=> 'bar', sub { warn "SET!" } );
+      $redis->get( 'foo', sub { my $value = shift } );
+
+      $redis->lpush( $key, $value );
+      $redis->lpop( $key, sub { my $value = shift });
+
+      # condvar based
+      my $cv = $redis->lpop( $key );
+      $cv->cb(sub { my $value = $_[0]->recv });
+
 DESCRIPTION
-    AnyEvent::Redis is
+    AnyEvent::Redis is a non-blocking Redis client using AnyEvent.
 
 AUTHOR
     Tatsuhiko Miyagawa <miyagawa@bulknews.net>
@@ -15,3 +28,5 @@ LICENSE
     under the same terms as Perl itself.
 
 SEE ALSO
+    Redis AnyEvent
+
