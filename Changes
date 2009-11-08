@@ -1,0 +1,4 @@
+Revision history for Perl extension AnyEvent::Redis
+
+0.01  Sun Nov  8 00:51:03 2009
+        - original version

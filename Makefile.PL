@@ -1,0 +1,12 @@
+use inc::Module::Install;
+name 'AnyEvent-Redis';
+all_from 'lib/AnyEvent/Redis.pm';
+readme_from 'lib/AnyEvent/Redis.pm';
+requires 'AnyEvent';
+build_requires 'Test::More';
+test_requires 'Test::TCP';
+use_test_base;
+auto_include_deps;
+author_tests('xt');
+auto_set_repository;
+WriteAll;
