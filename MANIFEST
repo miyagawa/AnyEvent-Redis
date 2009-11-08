@@ -19,12 +19,20 @@ inc/Test/Base/Filter.pm
 inc/Test/Builder.pm
 inc/Test/Builder/Module.pm
 inc/Test/More.pm
+inc/Test/SharedFork.pm
+inc/Test/SharedFork/Array.pm
+inc/Test/SharedFork/Scalar.pm
+inc/Test/SharedFork/Store.pm
+inc/Test/TCP.pm
 lib/AnyEvent/Redis.pm
 Makefile.PL
 MANIFEST			This list of files
 META.yml
 README
 t/00_compile.t
+t/client.t
+t/redis.conf.base
+t/Redis.pm
 xt/perlcritic.t
 xt/pod.t
 xt/podspell.t
