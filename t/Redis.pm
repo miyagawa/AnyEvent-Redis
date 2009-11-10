@@ -11,7 +11,7 @@ sub test_redis(&) {
     my $cb = shift;
 
     chomp(my $redis_server = `which redis-server`);
-    unless ($redis_server) {
+    unless ($redis_server && -e $redis_server && -x _) {
         plan skip_all => 'redis-server not found in your PATH';
     }
 
