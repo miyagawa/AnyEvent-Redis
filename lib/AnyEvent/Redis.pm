@@ -8,22 +8,24 @@ use constant DEBUG => $ENV{ANYEVENT_REDIS_DEBUG};
 use AnyEvent;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
-
-use base qw(Exporter);
-our @EXPORT = qw( redis_client );
+use Try::Tiny;
 
 our $AUTOLOAD;
 
 my %bulk_command = map { $_ => 1 }
     qw( set setnx rpush lpush lset lrem sadd srem sismember echo );
 
-sub redis_client { __PACKAGE__->new(@_) }
-
 sub new {
-    my($class, $host_port) = @_;
-    my($host, $port) = split /:/, $host_port || $ENV{REDIS_SERVER} || '127.0.0.1';
+    my($class, %args) = @_;
 
-    bless { host => $host, port => $port || 6379 }, $class;
+    my $host = delete $args{host} || '127.0.0.1';
+    my $port = delete $args{port} || 6379;
+
+    bless {
+        host => $host,
+        port => $port,
+        %args,
+    }, $class;
 }
 
 sub run_cmd {
@@ -85,8 +87,8 @@ sub connect {
             my $cv_send = sub {
                 my $cv = shift;
                 my($res, $err) = @_;
-                $err ? $cv->croak($res) : $cv->send($res);
                 $self->all_cv->end;
+                $err ? $cv->croak($res) : $cv->send($res);
             };
 
             my $send;
@@ -109,7 +111,15 @@ sub connect {
             warn $send if DEBUG;
 
             $cv ||= AE::cv;
-            $cv->cb(sub { $cb->($_[0]->recv) }) if $cb;
+            $cv->cb(sub {
+                my $cv = shift;
+                try {
+                    my $res = $cv->recv;
+                    $cb->($res);
+                } catch {
+                    ($self->{on_error} || sub { die @_ })->($_);
+                }
+            }) if $cb;
 
             $hd->push_write($send);
             $hd->push_read(line => sub {
@@ -201,7 +211,11 @@ AnyEvent::Redis - Non-blocking Redis client
 
   use AnyEvent::Redis;
 
-  my $redis = redis_client '127.0.0.1:6379';
+  my $redis = AnyEvent::Redis->new(
+      host => '127.0.0.1',
+      port => 6379,
+      on_error => sub { warn @_ },
+  );
 
   # callback based
   $redis->set( 'foo'=> 'bar', sub { warn "SET!" } );
