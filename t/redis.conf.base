@@ -39,7 +39,7 @@ dbfilename dump.rdb
 
 # For default save/load DB in/from the working directory
 # Note that you must specify a directory not a file name.
-dir ./
+dir __DIR__
 
 # Set server verbosity to 'debug'
 # it can be one of:

@@ -3,6 +3,7 @@ use strict;
 use Test::TCP;
 use Test::More;
 use AnyEvent::Redis;
+use FindBin;
 
 use base qw(Exporter);
 our @EXPORT = qw(test_redis);
@@ -30,12 +31,14 @@ sub test_redis(&) {
 
 sub rewrite_redis_conf {
     my $port = shift;
+    my $dir  = $FindBin::Bin;
 
     open my $in, "<", "t/redis.conf.base" or die $!;
     open my $out, ">", "t/redis.conf" or die $!;
 
     while (<$in>) {
         s/__PORT__/$port/;
+        s/__DIR__/$dir/;
         print $out $_;
     }
 }
