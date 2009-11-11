@@ -3,6 +3,7 @@ name 'AnyEvent-Redis';
 all_from 'lib/AnyEvent/Redis.pm';
 readme_from 'lib/AnyEvent/Redis.pm';
 requires 'AnyEvent';
+requires 'Try::Tiny';
 build_requires 'Test::More';
 test_requires 'Test::TCP';
 use_test_base;
