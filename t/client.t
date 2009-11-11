@@ -5,6 +5,8 @@ use t::Redis;
 test_redis {
     my $r = shift;
 
+    $r->all_cv->begin;
+
     my $info = $r->info->recv;
     is ref $info, 'HASH';
     ok $info->{redis_version};
@@ -18,7 +20,7 @@ test_redis {
     is $r->lpop("list")->recv, 'baz';
     is $r->lpop("list")->recv, 'bar';
 
-    $r->set("prefix.bar", "test", sub { $r->get("prefix.bar", sub { is $_[0], "test" }) });
+    $r->set("prefix.bar", "test", sub { $r->get("prefix.bar", sub { warn @_; is $_[0], "test" }) });
     $r->set("prefix.baz", "test");
 
     $r->keys('prefix.*', sub { my $keys = shift; is ref $keys, 'ARRAY'; is @$keys, 2 });
@@ -26,7 +28,7 @@ test_redis {
     my $cv = $r->get("nonx");
     is $cv->recv, undef;
 
-#    $r->all_cv->recv;
+    $r->all_cv->end;
 };
 
 done_testing;

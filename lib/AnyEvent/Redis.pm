@@ -45,7 +45,7 @@ sub AUTOLOAD {
 sub all_cv {
     my $self = shift;
     $self->{all_cv} = shift if @_;
-    unless ($self->{all_cv} && !$self->{all_cv}->ready) {
+    unless ($self->{all_cv}) {
         $self->{all_cv} = AE::cv;
     }
     $self->{all_cv};
