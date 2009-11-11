@@ -4,7 +4,11 @@ NAME
 SYNOPSIS
       use AnyEvent::Redis;
 
-      my $redis = redis_client '127.0.0.1:6379';
+      my $redis = AnyEvent::Redis->new(
+          host => '127.0.0.1',
+          port => 6379,
+          on_error => sub { warn @_ },
+      );
 
       # callback based
       $redis->set( 'foo'=> 'bar', sub { warn "SET!" } );
