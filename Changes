@@ -1,5 +1,8 @@
 Revision history for Perl extension AnyEvent::Redis
 
+0.04  Tue Nov 10 22:55:59 PST 2009
+        - Fixed deps
+
 0.03  Tue Nov 10 20:33:38 PST 2009
         - Changed the object construction API to always use new()
         - Implemented on_error for callback based error handling
