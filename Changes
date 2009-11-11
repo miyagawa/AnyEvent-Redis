@@ -1,4 +1,8 @@
 Revision history for Perl extension AnyEvent::Redis
 
+0.02  Tue Nov 10 17:49:39 PST 2009
+        - Fixed all_cv interface
+        - Fixed redis-server check in tests
+
 0.01  Sun Nov  8 00:51:03 2009
         - original version
