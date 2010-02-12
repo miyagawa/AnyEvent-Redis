@@ -1,5 +1,8 @@
 Revision history for Perl extension AnyEvent::Redis
 
+0.05  Fri Feb 12 10:33:44 PST 2010
+        - Fixed a typo in the on_error callback (jzawodn)
+
 0.04  Tue Nov 10 22:55:59 PST 2009
         - Fixed deps
 
