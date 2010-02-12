@@ -70,7 +70,7 @@ sub connect {
 
         my $hd = AnyEvent::Handle->new(
             fh => $fh,
-            on_error => sub { $_[0]->destory },
+            on_error => sub { $_[0]->destroy },
             on_eof   => sub { $_[0]->destroy },
         );
 
