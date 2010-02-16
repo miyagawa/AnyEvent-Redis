@@ -1,5 +1,8 @@
 Revision history for Perl extension AnyEvent::Redis
 
+0.06  Mon Feb 15 19:20:50 PST 2010
+        - Add more bulk commands: getset, smove, zadd, zrem, zscore, zincrby, append (Leon Brocard)
+
 0.05  Fri Feb 12 10:33:44 PST 2010
         - Fixed a typo in the on_error callback (jzawodn)
 
