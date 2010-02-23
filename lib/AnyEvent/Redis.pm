@@ -153,6 +153,9 @@ sub connect {
                 } elsif ( $type eq '*' ) {
                     my $size = $result;
                     warn "size is $size" if DEBUG;
+                    if ($result < 0) {
+                        return $cv_send->($cv, undef);
+                    }
                     my @lines;
                     my $multi_cb; $multi_cb = sub {
                         my $hd = shift;
