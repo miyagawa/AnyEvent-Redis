@@ -155,6 +155,8 @@ sub connect {
                     warn "size is $size" if DEBUG;
                     if ($result < 0) {
                         return $cv_send->($cv, undef);
+                    } elsif ($result == 0) {
+                        return $cv_send->($cv, []);
                     }
                     my @lines;
                     my $multi_cb; $multi_cb = sub {
