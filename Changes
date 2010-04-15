@@ -1,5 +1,8 @@
 Revision history for Perl extension AnyEvent::Redis
 
+0.09  Thu Apr 15 10:46:46 PDT 2010
+        - Fixed the test (hanekomu)
+
 0.08  Tue Mar  9 11:44:33 JST 2010
         - Immediately send [] if the length is 0 for multi-bulk replies (leedo)
 
