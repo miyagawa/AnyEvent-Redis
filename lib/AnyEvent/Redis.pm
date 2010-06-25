@@ -166,7 +166,8 @@ sub connect {
                             my($hd, $line) = @_;
                             warn "line: <$line>" if DEBUG;
                             $line =~ s/^.//;
-                            $hd->unshift_read(chunk => $line + 2, sub {
+                            my $chunk = ($line == -1) ? 0 : $line + 2;
+                            $hd->unshift_read(chunk => $chunk , sub {
                                 my($hd, $chunk) = @_;
                                 $chunk =~ s/\r\n$//;
                                 warn "chunk <$chunk>" if DEBUG;

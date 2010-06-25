@@ -23,6 +23,35 @@ test_redis {
     $r->set("prefix.bar", "test", sub { $r->get("prefix.bar", sub { is $_[0], "test" }) });
     $r->set("prefix.baz", "test");
 
+    $r->mget(
+        "prefix.bar",
+        "prefix.baz",
+        "foo",
+        sub {
+            my $res = shift;
+            is $res->[0], "test";
+            is $res->[2], "bar";
+        }
+    );
+    $r->mget(
+        1, 2, 3,
+        sub {
+            my $res = shift;
+            map { ok !$_ } @$res;
+        }
+    );
+    $r->mget(
+        1,
+        "prefix.baz",
+        "barbaz",
+        sub {
+            my $res = shift;
+            ok !$res->[0];
+            is $res->[1], "test";
+            ok !$res->[2];
+        }
+    );
+
     $r->keys('prefix.*', sub { my $keys = shift; is ref $keys, 'ARRAY'; is @$keys, 2 });
 
     my $cv = $r->get("nonx");
