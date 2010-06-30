@@ -52,6 +52,24 @@ test_redis {
         }
     );
 
+    if ($info->{redis_version} =~ /^2/) {
+        $r->hset("hash", "foo", "bar", sub { is $_[0], 1 });
+        $r->hset("hash", "baz", "foo");
+        $r->hget("hash", "foo", sub { is $_[0], "bar" });
+        $r->hmget("hash", "foo", "baz",
+            sub { my $res = shift; is $res->[0], "bar"; is $res->[1], "foo" });
+        $r->hdel("hash", "foo", sub { is $_[0], 1 });
+        $r->hmset("hash", "foo", 1, "bar", 2, "baz", 3,
+            sub { my $res = shift; ok $res });
+        $r->hincrby("hash", "foo", 2, sub { my $res = shift; is $res, 3 });
+        $r->hkeys("hash", sub {my $res = shift; is scalar @$res, 3;});
+        $r->hvals("hash", sub {my $res = shift; is scalar @$res, 3;});
+        $r->hgetall("hash", sub {my $res = shift; is scalar @$res, 6;});
+        for (qw/foo bar baz/) {
+            $r->hdel("hash", $_);
+        }
+    }
+
     $r->keys('prefix.*', sub { my $keys = shift; is ref $keys, 'ARRAY'; is @$keys, 2 });
 
     my $cv = $r->get("nonx");
