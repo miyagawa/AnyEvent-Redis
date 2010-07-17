@@ -9,11 +9,9 @@ use AnyEvent;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
 use Try::Tiny;
+use Carp qw(croak);
 
 our $AUTOLOAD;
-
-my %bulk_command = map { $_ => 1 }
-    qw( set setnx rpush lpush lset lrem sadd srem sismember echo getset smove zadd zrem zscore zincrby append hexists hset hget hmget hmset hdel);
 
 sub new {
     my($class, %args) = @_;
@@ -66,7 +64,10 @@ sub connect {
 
     $self->{sock} = tcp_connect $self->{host}, $self->{port}, sub {
         my $fh = shift
-            or die "Can't connect Redis server: $!";
+            or do {
+              $cv->croak("Can't connect Redis server: $!");
+              return
+            };
 
         my $hd = AnyEvent::Handle->new(
             fh => $fh,
@@ -84,111 +85,82 @@ sub connect {
                 $cb = pop if ref $_[-1] eq 'CODE';
             }
 
-            my $cv_send = sub {
-                my $cv = shift;
-                my($res, $err) = @_;
-                $self->all_cv->end;
-                $err ? $cv->croak($res) : $cv->send($res);
-            };
-
-            my $send;
-            if ( defined $bulk_command{$command} ) {
-                my $value = pop;
-                $value = '' if ! defined $value;
-                $send = uc($command)
-                      . ' '
-                      . join(' ', @_)
-                      . ' '
-                      . length( $value )
-                      . "\r\n$value\r\n";
-            } else {
-                $send = uc($command)
-                    . ' '
-                    . join(' ', @_)
-                    . "\r\n";
-            }
+            my $send = join("\r\n",
+                  "*" . (1 + @_),
+                  map(('$' . length $_ => $_), uc($command), @_))
+                . "\r\n";
 
             warn $send if DEBUG;
 
             $cv ||= AE::cv;
-            $cv->cb(sub {
-                my $cv = shift;
-                try {
-                    my $res = $cv->recv;
-                    $cb->($res);
-                } catch {
-                    ($self->{on_error} || sub { die @_ })->($_);
-                }
-            }) if $cb;
 
             $hd->push_write($send);
-            $hd->push_read(line => sub {
-                my($hd, $result) = @_;
-                warn "got line <$result> for command [$send]" if DEBUG;
-                my $type = substr $result, 0, 1;
-                $result =~ s/^.//;
 
-                if ( $type eq '-' ) {
-                    $cv_send->($cv, $result, 1);
-                } elsif ( $type eq '+' ) {
-                    $cv_send->($cv, $result);
-                } elsif ( $type eq '$' ) {
-                    if ($result < 0) {
-                        return $cv_send->($cv, undef);
+            if ($command !~ /^p?subscribe$/i) {
+
+                $cv->cb(sub {
+                    my $cv = shift;
+                    try {
+                        my $res = $cv->recv;
+                        $cb->($res);
+                    } catch {
+                        ($self->{on_error} || sub { die @_ })->($_);
                     }
-                    $hd->unshift_read(chunk => $result + 2, sub {
-                        my($hd, $chunk) = @_;
-                        $chunk =~ s/\r\n$//;
-                        warn "chunk <$chunk>" if DEBUG;
-                        if ($command eq 'info') {
-                            my %info = map { split /:/, $_, 2 } split /\r\n/, $chunk;
-                            $cv_send->($cv, \%info);
-                        } elsif ($command eq 'keys') {
-                            my @keys = split /\s+/, $chunk;
-                            $cv_send->($cv, \@keys);
-                        } else {
-                            $cv_send->($cv, $chunk);
+                }) if $cb;
+
+                $hd->push_read(ref $self => sub {
+                        my($res, $err) = @_;
+
+                        if($command eq 'info') {
+                          $res = { map { split /:/, $_, 2 } split /\r\n/, $res };
                         }
+
+                        $self->all_cv->end;
+                        $err ? $cv->croak($res) : $cv->send($res);
                     });
-                } elsif ( $type eq '*' ) {
-                    my $size = $result;
-                    warn "size is $size" if DEBUG;
-                    if ($result < 0) {
-                        return $cv_send->($cv, undef);
-                    } elsif ($result == 0) {
-                        return $cv_send->($cv, []);
-                    }
-                    my @lines;
-                    my $multi_cb; $multi_cb = sub {
-                        my $hd = shift;
-                        $hd->unshift_read(line => sub {
-                            my $size = $size; # nested closure!
-                            my($hd, $line) = @_;
-                            warn "line: <$line>" if DEBUG;
-                            $line =~ s/^.//;
-                            my $chunk = ($line == -1) ? 0 : $line + 2;
-                            $hd->unshift_read(chunk => $chunk , sub {
-                                my($hd, $chunk) = @_;
-                                $chunk =~ s/\r\n$//;
-                                warn "chunk <$chunk>" if DEBUG;
-                                push @lines, $chunk;
-                                if (@lines >= $size) {
-                                    undef $multi_cb;
-                                    $cv_send->($cv, \@lines);
-                                } else {
-                                    warn "RECURSE" if DEBUG;
-                                    $multi_cb->($hd); # recursive
+
+            } else {
+                croak "Must provide a CODE reference for subscriptions" unless $cb;
+
+                # Remember subscriptions
+                $self->{sub}->{$_} = [$cv, $cb] for @_;
+
+                my $res_cb; $res_cb = sub {
+
+                    $hd->push_read(ref $self => sub {
+                            my($res, $err) = @_;
+
+                            if(ref $res) {
+                                my $action = $res->[0];
+
+                                if($action eq 'message') {
+                                    warn "Message on $res->[1]" if DEBUG;
+                                    $self->{sub}->{$res->[1]}[1]->($res->[2], $res->[1]);
+
+                                } elsif($action eq 'subscribe') {
+                                    warn "Subscribe to $res->[1]" if DEBUG;
+                                    $self->{sub_count} = $res->[2];
+
+                                } elsif($action eq 'unsubscribe') {
+                                    warn "Unsubscribe from $res->[1]" if DEBUG;
+
+                                    $self->{sub_count} = $res->[2];
+                                    $self->{sub}->{$res->[1]}[0]->send;
+                                    delete $self->{sub}->{$res->[1]};
                                 }
-                            });
+                            }
+
+                            if($self->{sub_count}) {
+                                # Carry on reading while we are subscribed
+                                $res_cb->();
+                            } else {
+                                $self->all_cv->end;
+                            }
                         });
-                    };
-                    $multi_cb->($hd);
-                } elsif ( $type eq ':' ) {
-                    $cv_send->($cv, $result);
-                } else {
-                    $cv_send->($cv, "Unknown type $type", 1);
-                }
-            });
+                };
+
+                $res_cb->();
+            }
 
             return $cv;
         };
@@ -200,6 +172,96 @@ sub connect {
     };
 
     return $cv;
+}
+
+sub anyevent_read_type {
+    my(undef, $cb) = @_;
+
+    sub {
+        my($hd) = @_;
+
+        if($hd->{rbuf} =~ /^[-+:]/) {
+            $hd->{rbuf} =~ s/^([-+:])([^\015\012]*)\015?\012// or return;
+
+            $cb->($2, $1 eq '-');
+
+            return 1;
+
+        } elsif($hd->{rbuf} =~ /^\$/) {
+            $hd->{rbuf} =~ s/^\$([-0-9]+)\015?\012// or return;
+            my $len = $1;
+
+            if($len < 0) {
+                $cb->(undef);
+            } elsif($len + 2 <= length $hd->{rbuf}) {
+                $cb->(substr $hd->{rbuf}, 0, $len);
+                # Remove ending newline
+                substr $hd->{rbuf}, 0, $len + 2, "";
+            } else {
+                $hd->unshift_read (chunk => $len + 2, sub {
+                        $cb->(substr $_[1], 0, $len);
+                    });
+            }
+
+            return 1;
+
+        } elsif($hd->{rbuf} =~ /^\*/) {
+
+            $hd->{rbuf} =~ s/^\*([-0-9]+)\015?\012// or return;
+            my $size = $1;
+            my @lines;
+
+            my $reader; $reader = sub {
+                my($hd) = @_;
+
+                while(@lines < $size) {
+                    if($hd->{rbuf} =~ /^([\$:])([-0-9]+)\015?\012/) {
+                        my $type = $1;
+                        my $len = $2;
+
+                        if($type eq ':') {
+                            $hd->{rbuf} =~ s/^[^\012\015]+\015?\012//;
+                            push @lines, $len;
+                        } elsif($len < 0) {
+                            $hd->{rbuf} =~ s/^[^\012\015]+\015?\012//;
+                            push @lines, undef;
+
+                        } elsif($len <= length $hd->{rbuf}) {
+                            $hd->{rbuf} =~ s/^[^\012\015]+\015?\012//;
+                            push @lines, substr $hd->{rbuf}, 0, $len, "";
+                            $hd->{rbuf} =~ s/\015?\012//;
+
+                        } else {
+                            # Data not buffered, so we need to do this async
+                            $hd->unshift_read($reader);
+                            last;
+                        }
+                    } else {
+                        $hd->unshift_read($reader);
+                        last;
+                    }
+                }
+
+                $cb->(\@lines) if @lines == $size;
+            };
+
+            $reader->($hd);
+
+            return 1;
+
+        } elsif(length $hd->{rbuf}) {
+            # remove extra lines
+            $hd->{rbuf} =~ s/^\015?\012//g;
+
+            if(length $hd->{rbuf}) {
+                # Unknown
+                $cb->("Unknown type", 1);
+                return 1;
+            }
+        }
+
+        return;
+    }
 }
 
 1;
