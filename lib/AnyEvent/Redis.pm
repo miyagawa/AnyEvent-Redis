@@ -233,10 +233,10 @@ sub anyevent_read_type {
                             $hd->{rbuf} =~ s/^[^\012\015]+\015?\012//;
                             push @lines, undef;
 
-                        } elsif($len <= length $hd->{rbuf}) {
+                        } elsif(2 + $len <= length $hd->{rbuf}) {
                             $hd->{rbuf} =~ s/^[^\012\015]+\015?\012//;
                             push @lines, substr $hd->{rbuf}, 0, $len, "";
-                            $hd->{rbuf} =~ s/\015?\012//;
+                            $hd->{rbuf} =~ s/^\015?\012//;
 
                         } else {
                             # Data not buffered, so we need to do this async
