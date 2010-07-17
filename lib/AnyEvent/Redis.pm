@@ -137,16 +137,23 @@ sub connect {
                                     warn "Message on $res->[1]" if DEBUG;
                                     $self->{sub}->{$res->[1]}[1]->($res->[2], $res->[1]);
 
-                                } elsif($action eq 'subscribe') {
+                                } elsif($action eq 'pmessage') {
+                                    warn "Pmessage on $res->[1] ($res->[2])" if DEBUG;
+                                    $self->{sub}->{$res->[1]}[1]->($res->[3], $res->[2], $res->[1]);
+
+                                } elsif($action eq 'subscribe' || $action eq 'psubscribe') {
                                     warn "Subscribe to $res->[1]" if DEBUG;
                                     $self->{sub_count} = $res->[2];
 
-                                } elsif($action eq 'unsubscribe') {
+                                } elsif($action eq 'unsubscribe' || $action eq 'punsubscribe') {
                                     warn "Unsubscribe from $res->[1]" if DEBUG;
 
                                     $self->{sub_count} = $res->[2];
                                     $self->{sub}->{$res->[1]}[0]->send;
                                     delete $self->{sub}->{$res->[1]};
+
+                                } else {
+                                    warn "Unknown pubsub action: $action";
                                 }
                             }
 
