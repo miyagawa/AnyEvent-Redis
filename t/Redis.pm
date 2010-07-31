@@ -25,7 +25,7 @@ sub test_redis(&) {
         client => sub {
             my $port = shift;
             my $r = AnyEvent::Redis->new(host => "127.0.0.1", port => $port);
-            $cb->($r);
+            $cb->($r, $port);
         };
 }
 
