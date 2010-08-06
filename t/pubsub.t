@@ -8,6 +8,8 @@ test_redis {
 
     my $pub = AnyEvent::Redis->new(host => "127.0.0.1", port => $port);
 
+    my $all_cv = AE::cv;
+
     # $pub is for publishing
     # $sub is for subscribing
 
@@ -25,6 +27,8 @@ test_redis {
                 is $x, $expected_x, "Messages received, values as expected";
             }
         });
+    $all_cv->begin;
+    $sub1_cv->cb(sub { $sub1_cv->recv; $all_cv->end });
 
     for(1 .. $expected_count) {
         my $cv = $pub->publish("test.1" => $_);
@@ -37,24 +41,28 @@ test_redis {
     my $y = 0;
     my $expected_y = 0;
 
-    my $count = 0;
-    my $expected_count = 10;
+    my $count2 = 0;
+    my $expected_count2 = 10;
 
     my $sub2_cv = $sub->psubscribe("test.*", sub {
             my($message, $chan) = @_;
             $y += $message;
-            if(++$count == $expected_count) {
+            if(++$count2 == $expected_count2) {
                 $sub->punsubscribe("test.*");
                 is $y, $expected_y, "Messages received, values as expected";
             }
         });
+    $all_cv->begin;
+    $sub2_cv->cb(sub { $sub2_cv->recv; $all_cv->end });
 
-    for(1 .. $expected_count) {
+    for(1 .. $expected_count2) {
         my $cv = $pub->publish("test.$_" => $_);
         $expected_y += $_;
         # Need to be sure a client has subscribed
         $expected_y = 0, redo unless $cv->recv;
     }
+
+    $all_cv->recv;
 };
 
 done_testing;

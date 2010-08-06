@@ -96,7 +96,16 @@ sub connect {
 
             $hd->push_write($send);
 
-            if ($command !~ /^p?subscribe$/i) {
+            # Are we already subscribed to anything?
+            if($self->{sub} && %{$self->{sub}}) {
+
+              croak "Use of non-pubsub command during pubsub session may result in unexpected behaviour"
+                unless $command =~ /^p?(?:un)?subscribe$/i;
+
+              # Remember subscriptions
+              $self->{sub}->{$_} ||= [$cv, $cb] for @_;
+
+            } elsif ($command !~ /^p?subscribe$/i) {
 
                 $cv->cb(sub {
                     my $cv = shift;
@@ -123,7 +132,7 @@ sub connect {
                 croak "Must provide a CODE reference for subscriptions" unless $cb;
 
                 # Remember subscriptions
-                $self->{sub}->{$_} = [$cv, $cb] for @_;
+                $self->{sub}->{$_} ||= [$cv, $cb] for @_;
 
                 my $res_cb; $res_cb = sub {
 
@@ -131,37 +140,33 @@ sub connect {
                             my($res, $err) = @_;
 
                             if(ref $res) {
-                                my $action = $res->[0];
+                                my $action = lc $res->[0];
+                                warn "$action $res->[1]" if DEBUG;
 
                                 if($action eq 'message') {
-                                    warn "Message on $res->[1]" if DEBUG;
                                     $self->{sub}->{$res->[1]}[1]->($res->[2], $res->[1]);
 
                                 } elsif($action eq 'pmessage') {
-                                    warn "Pmessage on $res->[1] ($res->[2])" if DEBUG;
                                     $self->{sub}->{$res->[1]}[1]->($res->[3], $res->[2], $res->[1]);
 
                                 } elsif($action eq 'subscribe' || $action eq 'psubscribe') {
-                                    warn "Subscribe to $res->[1]" if DEBUG;
                                     $self->{sub_count} = $res->[2];
 
                                 } elsif($action eq 'unsubscribe' || $action eq 'punsubscribe') {
-                                    warn "Unsubscribe from $res->[1]" if DEBUG;
-
                                     $self->{sub_count} = $res->[2];
+                                    warn "$self->{sub}->{$res->[1]}[0]";
                                     $self->{sub}->{$res->[1]}[0]->send;
                                     delete $self->{sub}->{$res->[1]};
+                                    $self->all_cv->end;
 
                                 } else {
                                     warn "Unknown pubsub action: $action";
                                 }
                             }
 
-                            if($self->{sub_count}) {
+                            if($self->{sub_count} || %{$self->{sub}}) {
                                 # Carry on reading while we are subscribed
                                 $res_cb->();
-                            } else {
-                                $self->all_cv->end;
                             }
                         });
                 };
@@ -186,6 +191,8 @@ sub anyevent_read_type {
 
     sub {
         my($hd) = @_;
+
+        return unless defined $hd->{rbuf};
 
         if($hd->{rbuf} =~ /^[-+:]/) {
             $hd->{rbuf} =~ s/^([-+:])([^\015\012]*)\015?\012// or return;
@@ -249,12 +256,15 @@ sub anyevent_read_type {
                     }
                 }
 
-                $cb->(\@lines) if @lines == $size;
+                if(@lines == $size) {
+                  $cb->(\@lines);
+                  return 1;
+                }
+
+                return;
             };
 
-            $reader->($hd);
-
-            return 1;
+            return $reader->($hd);
 
         } elsif(length $hd->{rbuf}) {
             # remove extra lines
