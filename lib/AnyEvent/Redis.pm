@@ -317,6 +317,79 @@ AnyEvent::Redis - Non-blocking Redis client
 
 AnyEvent::Redis is a non-blocking Redis client using AnyEvent.
 
+=head1 METHODS
+
+All methods supported by your version of Redis should be supported.
+
+=head2 Normal commands
+
+There are two alternative approaches for handling results from commands.
+
+=over 4
+
+=item * L<AnyEvent::CondVar> based:
+
+  my $cv = $redis->command(
+    # arguments to command
+  );
+
+  $cv->cb(sub {
+    my($cv) = @_;
+    my($result, $err) = $cv->recv
+  });
+
+=item * Callback:
+
+  $redis->command(
+    # arguments,
+    sub {
+      my($result, $err) = @_;
+    });
+
+(Callback is a wrapper around the C<$cv> approach.)
+
+=back
+
+=head2 Subscriptions
+
+The subscription methods (C<subscribe> and C<psubscribe>) must be used with a callback:
+
+  my $cv = $redis->subscribe("test", sub {
+    my($message, $channel[, $actual_channel]) = @_;
+    # ($actual_channel is provided for pattern subscriptions.)
+  });
+
+The C<$cv> condition will be met on unsubscribing from the channel.
+
+Due to limitations of the Redis protocol the only valid commands on a
+connection with an active subscription are subscribe and unsubscribe commands.
+
+=head2 Common methods
+
+=over 4
+
+=item * get
+
+=item * set
+
+=item * hset
+
+=item * hget
+
+=item * lpush
+
+=item * lpop
+
+=back
+
+The Redis command reference
+(L<http://code.google.com/p/redis/wiki/CommandReference>) lists all commands
+Redis supports.
+
+=head1 REQUIREMENTS
+
+This requires Redis >= 1.2.
+
 =head1 AUTHOR
 
 Tatsuhiko Miyagawa E<lt>miyagawa@bulknews.netE<gt>
@@ -328,6 +401,6 @@ it under the same terms as Perl itself.
 
 =head1 SEE ALSO
 
-L<Redis> L<AnyEvent>
+L<Redis>, L<AnyEvent>
 
 =cut
