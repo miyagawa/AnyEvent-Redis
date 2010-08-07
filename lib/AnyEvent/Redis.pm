@@ -122,73 +122,7 @@ sub connect {
             }) if $cb;
 
             $hd->push_write($send);
-            $hd->push_read(line => sub {
-                my($hd, $result) = @_;
-                warn "got line <$result> for command [$send]" if DEBUG;
-                my $type = substr $result, 0, 1;
-                $result =~ s/^.//;
-
-                if ( $type eq '-' ) {
-                    $cv_send->($cv, $result, 1);
-                } elsif ( $type eq '+' ) {
-                    $cv_send->($cv, $result);
-                } elsif ( $type eq '$' ) {
-                    if ($result < 0) {
-                        return $cv_send->($cv, undef);
-                    }
-                    $hd->unshift_read(chunk => $result + 2, sub {
-                        my($hd, $chunk) = @_;
-                        $chunk =~ s/\r\n$//;
-                        warn "chunk <$chunk>" if DEBUG;
-                        if ($command eq 'info') {
-                            my %info = map { split /:/, $_, 2 } split /\r\n/, $chunk;
-                            $cv_send->($cv, \%info);
-                        } elsif ($command eq 'keys') {
-                            my @keys = split /\s+/, $chunk;
-                            $cv_send->($cv, \@keys);
-                        } else {
-                            $cv_send->($cv, $chunk);
-                        }
-                    });
-                } elsif ( $type eq '*' ) {
-                    my $size = $result;
-                    warn "size is $size" if DEBUG;
-                    if ($result < 0) {
-                        return $cv_send->($cv, undef);
-                    } elsif ($result == 0) {
-                        return $cv_send->($cv, []);
-                    }
-                    my @lines;
-                    my $multi_cb; $multi_cb = sub {
-                        my $hd = shift;
-                        $hd->unshift_read(line => sub {
-                            my $size = $size; # nested closure!
-                            my($hd, $line) = @_;
-                            warn "line: <$line>" if DEBUG;
-                            $line =~ s/^.//;
-                            my $chunk = ($line == -1) ? 0 : $line + 2;
-                            $hd->unshift_read(chunk => $chunk , sub {
-                                my($hd, $chunk) = @_;
-                                $chunk =~ s/\r\n$//;
-                                warn "chunk <$chunk>" if DEBUG;
-                                push @lines, $chunk;
-                                if (@lines >= $size) {
-                                    undef $multi_cb;
-                                    $cv_send->($cv, \@lines);
-                                } else {
-                                    warn "RECURSE" if DEBUG;
-                                    $multi_cb->($hd); # recursive
-                                }
-                            });
-                        });
-                    };
-                    $multi_cb->($hd);
-                } elsif ( $type eq ':' ) {
-                    $cv_send->($cv, $result);
-                } else {
-                    $cv_send->($cv, "Unknown type $type", 1);
-                }
-            });
+            $hd->push_read(line => _decoder($send, $cv, $cv_send, $command));
 
             return $cv;
         };
@@ -202,6 +136,64 @@ sub connect {
     return $cv;
 }
 
+sub _decoder {
+    my ($send, $cv, $cv_send, $command) = @_;
+    sub {
+        my($hd, $result) = @_;
+        warn "got line <$result> for command [$send]" if DEBUG;
+        my $type = substr $result, 0, 1;
+        $result =~ s/^.//;
+
+        if ( $type eq '-' ) {
+            $cv_send->($cv, $result, 1);
+        } elsif ( $type eq '+' ) {
+            $cv_send->($cv, $result);
+        } elsif ( $type eq '$' ) {
+            if ($result < 0) {
+                return $cv_send->($cv, undef);
+            }
+            $hd->unshift_read(chunk => $result + 2, sub {
+                        my($hd, $chunk) = @_;
+                        $chunk =~ s/\r\n$//;
+                        warn "chunk <$chunk>" if DEBUG;
+                        if ($command eq 'info') {
+                            my %info = map { split /:/, $_, 2 } split /\r\n/, $chunk;
+                            $cv_send->($cv, \%info);
+                        } elsif ($command eq 'keys') {
+                            my @keys = split /\s+/, $chunk;
+                            $cv_send->($cv, \@keys);
+                        } else {
+                            $cv_send->($cv, $chunk);
+                        }
+                    });
+        } elsif ( $type eq '*' ) {
+            my $size = $result;
+            warn "size is $size" if DEBUG;
+            if ($result < 0) {
+                return $cv_send->($cv, undef);
+            } elsif ($result == 0) {
+                return $cv_send->($cv, []);
+            }
+            my @lines;
+            for (1..$size) {
+                $hd->unshift_read(line => _decoder
+                                      ("recursion $_ of $send", undef,
+                                       sub { my (undef, $result) = @_;
+                                             push @lines, $result;
+                                             if (@lines >= $size) {
+                                                 $cv_send->($cv, \@lines);
+                                             }
+                                         },
+                                       $command
+                                   ));
+            }
+        } elsif ( $type eq ':' ) {
+            $cv_send->($cv, $result);
+        } else {
+            $cv_send->($cv, "Unknown type $type", 1);
+        }
+    }
+}
 1;
 __END__
 
