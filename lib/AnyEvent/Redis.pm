@@ -219,6 +219,7 @@ AnyEvent::Redis - Non-blocking Redis client
   $redis->set( 'foo'=> 'bar', sub { warn "SET!" } );
   $redis->get( 'foo', sub { my $value = shift } );
 
+  my ($key, $value) = ('list_key', 123);
   $redis->lpush( $key, $value );
   $redis->lpop( $key, sub { my $value = shift });
 
