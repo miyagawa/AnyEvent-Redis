@@ -1,5 +1,8 @@
 Revision history for Perl extension AnyEvent::Redis
 
+0.11  Fri Aug  6 23:09:41 PDT 2010
+        - Refactored the decoder so nested MULTI/EXEC responses work (clkao)
+
 0.10  Fri Jul  2 17:02:16 PDT 2010
         - Support command operations on hashes for Redis 2.0 (franck)
         - Fixed MGET on non-existent keys (franck)
