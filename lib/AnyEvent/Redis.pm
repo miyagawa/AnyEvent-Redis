@@ -13,7 +13,7 @@ use Try::Tiny;
 our $AUTOLOAD;
 
 my %bulk_command = map { $_ => 1 }
-    qw( set setnx rpush lpush lset lrem sadd srem sismember echo getset smove zadd zrem zscore zincrby append hexists hset hget hmget hmset hdel);
+    qw( set setnx rpush lpush lset lrem sadd srem sismember echo getset smove zadd zrem zscore zincrby append hexists hset hsetnx hget hmget hmset hdel);
 
 sub new {
     my($class, %args) = @_;
