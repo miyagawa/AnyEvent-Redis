@@ -53,6 +53,13 @@ sub all_cv {
     $self->{all_cv};
 }
 
+sub cleanup {
+    my $self = shift;
+    delete $self->{cmd_cb};
+    delete $self->{sock};
+    $self->{on_error}->(@_);
+}
+
 sub connect {
     my $self = shift;
 
@@ -70,8 +77,14 @@ sub connect {
 
         my $hd = AnyEvent::Handle->new(
             fh => $fh,
-            on_error => sub { $_[0]->destroy },
-            on_eof   => sub { $_[0]->destroy },
+            on_error => sub { $_[0]->destroy;
+                              if ($_[1]) {
+                                  $self->cleanup($_[2]);
+                              }
+                          },
+            on_eof   => sub { $_[0]->destroy;
+                              $self->cleanup('connection closed');
+                          },
         );
 
         $self->{cmd_cb} = sub {
