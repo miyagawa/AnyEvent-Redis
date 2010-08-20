@@ -2,7 +2,7 @@ package AnyEvent::Redis;
 
 use strict;
 use 5.008_001;
-our $VERSION = '0.10';
+our $VERSION = '0.12';
 
 use constant DEBUG => $ENV{ANYEVENT_REDIS_DEBUG};
 use AnyEvent;
@@ -51,6 +51,13 @@ sub all_cv {
     $self->{all_cv};
 }
 
+sub cleanup {
+    my $self = shift;
+    delete $self->{cmd_cb};
+    delete $self->{sock};
+    $self->{on_error}->(@_);
+}
+
 sub connect {
     my $self = shift;
 
@@ -71,8 +78,14 @@ sub connect {
 
         my $hd = AnyEvent::Handle->new(
             fh => $fh,
-            on_error => sub { $_[0]->destroy },
-            on_eof   => sub { $_[0]->destroy },
+            on_error => sub { $_[0]->destroy;
+                              if ($_[1]) {
+                                  $self->cleanup($_[2]);
+                              }
+                          },
+            on_eof   => sub { $_[0]->destroy;
+                              $self->cleanup('connection closed');
+                          },
         );
 
         $self->{cmd_cb} = sub {
@@ -117,7 +130,7 @@ sub connect {
                     }
                 }) if $cb;
 
-                $hd->push_read(ref $self => sub {
+                $hd->push_read(redis => sub {
                         my($res, $err) = @_;
 
                         if($command eq 'info') {
@@ -154,7 +167,6 @@ sub connect {
 
                                 } elsif($action eq 'unsubscribe' || $action eq 'punsubscribe') {
                                     $self->{sub_count} = $res->[2];
-                                    warn "$self->{sub}->{$res->[1]}[0]";
                                     $self->{sub}->{$res->[1]}[0]->send;
                                     delete $self->{sub}->{$res->[1]};
                                     $self->all_cv->end;
@@ -181,12 +193,18 @@ sub connect {
             my($cv, @args) = @$queue;
             $self->{cmd_cb}->(@args, $cv);
         }
+
     };
 
     return $cv;
 }
 
-sub anyevent_read_type {
+# For some reason the package based AnyEvent::Handle read type is not supported
+# for unshift_read, only push_read, so we register this as a read type rather
+# than using the package based form. Maybe AnyEvent could support using the
+# package form for this one day.
+
+AnyEvent::Handle::register_read_type(redis => sub {
     my(undef, $cb) = @_;
 
     sub {
@@ -229,36 +247,48 @@ sub anyevent_read_type {
                 my($hd) = @_;
 
                 while(@lines < $size) {
-                    if($hd->{rbuf} =~ /^([\$:])([-0-9]+)\015?\012/) {
+                    if($hd->{rbuf} =~ /^([\$\-+:])([^\012\015]+)\015?\012/) {
                         my $type = $1;
-                        my $len = $2;
+                        my $line = $2;
 
-                        if($type eq ':') {
+                        if($type =~ /[-+:]/) {
                             $hd->{rbuf} =~ s/^[^\012\015]+\015?\012//;
-                            push @lines, $len;
-                        } elsif($len < 0) {
+                            push @lines, $line;
+                        } elsif($line < 0) {
                             $hd->{rbuf} =~ s/^[^\012\015]+\015?\012//;
                             push @lines, undef;
 
-                        } elsif(2 + $len <= length $hd->{rbuf}) {
+                        } elsif(2 + $line <= length $hd->{rbuf}) {
                             $hd->{rbuf} =~ s/^[^\012\015]+\015?\012//;
-                            push @lines, substr $hd->{rbuf}, 0, $len, "";
+                            push @lines, substr $hd->{rbuf}, 0, $line, "";
                             $hd->{rbuf} =~ s/^\015?\012//;
 
                         } else {
                             # Data not buffered, so we need to do this async
                             $hd->unshift_read($reader);
-                            last;
+                            return 1;
                         }
+                    } elsif($hd->{rbuf} =~ /^\*/) { # Nested
+                        
+                        $hd->unshift_read(redis => sub {
+                                push @lines, $_[0];
+
+                                if(@lines == $size) {
+                                    $cb->(\@lines);
+                                } else {
+                                    $hd->unshift_read($reader);
+                                }
+                                return 1;
+                            });
+                        return 1;
                     } else {
                         $hd->unshift_read($reader);
-                        last;
                     }
                 }
 
-                if(@lines == $size) {
-                  $cb->(\@lines);
-                  return 1;
+                if($size < 0 || @lines == $size) {
+                    $cb->($size < 0 ? undef : \@lines);
+                    return 1;
                 }
 
                 return;
@@ -279,7 +309,7 @@ sub anyevent_read_type {
 
         return;
     }
-}
+});
 
 1;
 __END__
@@ -306,6 +336,7 @@ AnyEvent::Redis - Non-blocking Redis client
   $redis->set( 'foo'=> 'bar', sub { warn "SET!" } );
   $redis->get( 'foo', sub { my $value = shift } );
 
+  my ($key, $value) = ('list_key', 123);
   $redis->lpush( $key, $value );
   $redis->lpop( $key, sub { my $value = shift });
 
