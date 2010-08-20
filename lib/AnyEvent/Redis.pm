@@ -149,7 +149,7 @@ sub connect {
 
                 my $res_cb; $res_cb = sub {
 
-                    $hd->push_read(ref $self => sub {
+                    $hd->push_read(redis => sub {
                             my($res, $err) = @_;
 
                             if(ref $res) {
