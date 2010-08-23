@@ -130,7 +130,7 @@ sub connect {
                     }
                 }) if $cb;
 
-                $hd->push_read(redis => sub {
+                $hd->push_read(ref $self => sub {
                         my($res, $err) = @_;
 
                         if($command eq 'info') {
@@ -149,7 +149,7 @@ sub connect {
 
                 my $res_cb; $res_cb = sub {
 
-                    $hd->push_read(redis => sub {
+                    $hd->push_read(ref $self => sub {
                             my($res, $err) = @_;
 
                             if(ref $res) {
@@ -199,12 +199,7 @@ sub connect {
     return $cv;
 }
 
-# For some reason the package based AnyEvent::Handle read type is not supported
-# for unshift_read, only push_read, so we register this as a read type rather
-# than using the package based form. Maybe AnyEvent could support using the
-# package form for this one day.
-
-AnyEvent::Handle::register_read_type(redis => sub {
+sub anyevent_read_type {
     my(undef, $cb) = @_;
 
     sub {
@@ -269,8 +264,8 @@ AnyEvent::Handle::register_read_type(redis => sub {
                             return 1;
                         }
                     } elsif($hd->{rbuf} =~ /^\*/) { # Nested
-                        
-                        $hd->unshift_read(redis => sub {
+
+                        $hd->unshift_read(__PACKAGE__, sub {
                                 push @lines, $_[0];
 
                                 if(@lines == $size) {
@@ -309,7 +304,7 @@ AnyEvent::Handle::register_read_type(redis => sub {
 
         return;
     }
-});
+}
 
 1;
 __END__
