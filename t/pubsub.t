@@ -6,6 +6,17 @@ test_redis {
     my $sub = shift;
     my $port = shift;
 
+    my $info = $sub->info->recv;
+    if($info->{redis_version} lt "1.3.10") {
+      # Test::TCP needs to cleanup, plan skip_all calls exit(0), see:
+      # https://rt.cpan.org/Ticket/Display.html?id=60657
+      print "1..0 # SKIP No PUBLISH/SUBSCRIBE support in this Redis version\n";
+      # Hoop jumping to output our own TAP...
+      $Test::Builder::Test->no_ending(1);
+      $Test::Builder::Test->no_header(1);
+      return;
+    }
+
     my $pub = AnyEvent::Redis->new(host => "127.0.0.1", port => $port);
 
     my $all_cv = AE::cv;
@@ -63,7 +74,6 @@ test_redis {
     }
 
     $all_cv->recv;
+    done_testing;
 };
-
-done_testing;
 
