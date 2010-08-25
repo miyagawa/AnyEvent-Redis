@@ -5,7 +5,7 @@ readme_from 'lib/AnyEvent/Redis.pm';
 requires 'AnyEvent';
 requires 'Try::Tiny';
 build_requires 'Test::More';
-test_requires 'Test::TCP';
+test_requires 'Test::TCP',  1.03;
 use_test_base;
 auto_include_deps;
 author_tests('xt');

@@ -36,11 +36,6 @@ test_redis {
       done_testing;
 
     } else {
-      # Test::TCP needs to cleanup, plan skip_all calls exit(0), see:
-      # https://rt.cpan.org/Ticket/Display.html?id=60657
-      print "1..0 # SKIP No support for MULTI in this server version\n";
-      # Hoop jumping to output our own TAP...
-      $Test::Builder::Test->no_ending(1);
-      $Test::Builder::Test->no_header(1);
+      plan skip_all => "No support for MULTI in this server version";
     }
 };
