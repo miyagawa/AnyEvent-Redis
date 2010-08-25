@@ -419,14 +419,32 @@ Redis supports.
 
 This requires Redis >= 1.2.
 
-=head1 AUTHOR
+=head1 COPYRIGHT
 
-Tatsuhiko Miyagawa E<lt>miyagawa@bulknews.netE<gt>
+Tatsuhiko Miyagawa E<lt>miyagawa@bulknews.netE<gt> 2009-
 
 =head1 LICENSE
 
 This library is free software; you can redistribute it and/or modify
 it under the same terms as Perl itself.
+
+=head1 AUTHORS
+
+Tatsuhiko Miyagawa
+
+David Leadbeater
+
+Chia-liang Kao
+
+franck cuny
+
+Lee Aylward
+
+Joshua Barratt
+
+Jeremy Zawodn
+
+Leon Brocard
 
 =head1 SEE ALSO
 

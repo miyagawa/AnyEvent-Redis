@@ -1,5 +1,11 @@
 Revision history for Perl extension AnyEvent::Redis
 
+0.19_01 Wed Aug 25 12:46:59 PDT 2010
+        - Added PubSub support (dgl)
+        - Documentations improved (dgl)
+        - Fixed KEYS for 1.2 server (dgl)
+        - Bumped Test::TCP dep (dgl)
+
 0.12  Sun Aug  8 23:34:59 PDT 2010
         - Added HSETNX (clkao)
         - Reset the state when EOF or on error (clkao)
