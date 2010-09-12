@@ -1,5 +1,8 @@
 Revision history for Perl extension AnyEvent::Redis
 
+0.20  Sun Sep 12 12:46:36 PDT 2010
+        - cleanup on connection failure (leedo)
+
 0.19_01 Wed Aug 25 12:46:59 PDT 2010
         - Added PubSub support (dgl)
         - Documentations improved (dgl)

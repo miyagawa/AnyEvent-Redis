@@ -43,7 +43,7 @@ sub rewrite_redis_conf {
     }
 }
 
-END { unlink "t/redis.conf" }
+END { unlink $_ for "t/redis.conf", "t/dump.rdb" }
 
 1;
 
