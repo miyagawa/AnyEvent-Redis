@@ -55,7 +55,7 @@ sub cleanup {
     my $self = shift;
     delete $self->{cmd_cb};
     delete $self->{sock};
-    $self->{on_error}->(@_);
+    $self->{on_error}->(@_) if $self->{on_error};
 }
 
 sub connect {
@@ -72,7 +72,9 @@ sub connect {
     $self->{sock} = tcp_connect $self->{host}, $self->{port}, sub {
         my $fh = shift
             or do {
-              $cv->croak("Can't connect Redis server: $!");
+              my $err = "Can't connect Redis server: $!";
+              $self->cleanup($err);
+              $cv->croak($err);
               return
             };
 
