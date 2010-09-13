@@ -241,10 +241,12 @@ sub anyevent_read_type {
 
             $hd->{rbuf} =~ s/^\*([-0-9]+)\015?\012// or return;
             my $size = $1;
+            warn "expecting $size values" if DEBUG;
+
             my @lines;
 
             my $reader; $reader = sub {
-                my($hd) = @_;
+                my($hd, $async) = @_;
 
                 while(@lines < $size) {
                     if($hd->{rbuf} =~ /^([\$\-+:])([^\012\015]+)\015?\012/) {
@@ -258,15 +260,17 @@ sub anyevent_read_type {
                             $hd->{rbuf} =~ s/^[^\012\015]+\015?\012//;
                             push @lines, undef;
 
-                        } elsif(2 + $line <= length $hd->{rbuf}) {
+                        } elsif((1 + length($2) + 2 # Initial line
+                                 + $line + 2)       # Data and newline
+                                <= length $hd->{rbuf}) {
                             $hd->{rbuf} =~ s/^[^\012\015]+\015?\012//;
                             push @lines, substr $hd->{rbuf}, 0, $line, "";
                             $hd->{rbuf} =~ s/^\015?\012//;
 
                         } else {
                             # Data not buffered, so we need to do this async
-                            $hd->unshift_read($reader);
-                            return 1;
+                            $hd->unshift_read($reader) if $async;
+                            return $async;
                         }
                     } elsif($hd->{rbuf} =~ /^\*/) { # Nested
 
@@ -274,6 +278,7 @@ sub anyevent_read_type {
                                 push @lines, $_[0];
 
                                 if(@lines == $size) {
+                                    warn "$size nested values" if DEBUG;
                                     $cb->(\@lines);
                                 } else {
                                     $hd->unshift_read($reader);
@@ -282,19 +287,21 @@ sub anyevent_read_type {
                             });
                         return 1;
                     } else {
-                        $hd->unshift_read($reader);
+                        $hd->unshift_read($reader) if $async;
+                        return $async;
                     }
                 }
 
                 if($size < 0 || @lines == $size) {
+                    warn "Got $size values" if DEBUG;
                     $cb->($size < 0 ? undef : \@lines);
                     return 1;
                 }
 
-                return;
+                die "unreachable";
             };
 
-            return $reader->($hd);
+            return $reader->($hd, 1);
 
         } elsif(length $hd->{rbuf}) {
             # remove extra lines
