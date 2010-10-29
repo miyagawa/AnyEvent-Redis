@@ -18,8 +18,10 @@ META.yml
 README
 t/00_compile.t
 t/client.t
+t/lrange.t
 t/multi.t
 t/pubsub.t
+t/reconnect.t
 t/redis.conf.base
 t/Redis.pm
 xt/perlcritic.t
