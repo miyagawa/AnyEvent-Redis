@@ -295,6 +295,7 @@ sub anyevent_read_type {
                 if($size < 0 || @lines == $size) {
                     warn "Got $size values" if DEBUG;
                     $cb->($size < 0 ? undef : \@lines);
+                    undef $reader;
                     return 1;
                 }
 
@@ -451,7 +452,7 @@ Lee Aylward
 
 Joshua Barratt
 
-Jeremy Zawodn
+Jeremy Zawodny
 
 Leon Brocard
 
