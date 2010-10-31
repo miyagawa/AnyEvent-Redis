@@ -273,6 +273,7 @@ sub anyevent_read_type {
                             return $async;
                         }
                     } elsif($hd->{rbuf} =~ /^\*/) { # Nested
+                        my $reader_closure = $reader; # Need to avoid holding circular ref
 
                         $hd->unshift_read(__PACKAGE__, sub {
                                 push @lines, $_[0];
@@ -280,11 +281,14 @@ sub anyevent_read_type {
                                 if(@lines == $size) {
                                     warn "$size nested values" if DEBUG;
                                     $cb->(\@lines);
+                                    undef $reader_closure;
                                 } else {
-                                    $hd->unshift_read($reader);
+                                    $hd->unshift_read($reader_closure);
                                 }
                                 return 1;
                             });
+
+                        undef $reader;
                         return 1;
                     } else {
                         $hd->unshift_read($reader) if $async;
