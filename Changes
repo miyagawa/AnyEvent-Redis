@@ -1,5 +1,8 @@
 Revision history for Perl extension AnyEvent::Redis
 
+0.22  Sun Oct 31 20:38:52 PDT 2010
+        - Fixed memory leaks with MULTI commands (dgl)
+
 0.21  Fri Oct 29 15:18:52 PDT 2010
         - Fixed async buffering issue with LRANGE command (leedo, dgl)
         - Fixed circular reference memory leaks (jzawodny)

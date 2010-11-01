@@ -18,6 +18,7 @@ META.yml
 README
 t/00_compile.t
 t/client.t
+t/leak.t
 t/lrange.t
 t/multi.t
 t/pubsub.t
