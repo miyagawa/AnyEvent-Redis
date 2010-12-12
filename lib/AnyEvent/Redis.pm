@@ -2,12 +2,13 @@ package AnyEvent::Redis;
 
 use strict;
 use 5.008_001;
-our $VERSION = '0.22';
+our $VERSION = '0.23_01';
 
 use constant DEBUG => $ENV{ANYEVENT_REDIS_DEBUG};
 use AnyEvent;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
+use AnyEvent::Redis::Protocol;
 use Try::Tiny;
 use Carp qw(croak);
 
@@ -132,7 +133,7 @@ sub connect {
                     }
                 }) if $cb;
 
-                $hd->push_read(ref $self => sub {
+                $hd->push_read("AnyEvent::Redis::Protocol" => sub {
                         my($res, $err) = @_;
 
                         if($command eq 'info') {
@@ -154,7 +155,7 @@ sub connect {
 
                 my $res_cb; $res_cb = sub {
 
-                    $hd->push_read(ref $self => sub {
+                    $hd->push_read("AnyEvent::Redis::Protocol" => sub {
                             my($res, $err) = @_;
 
                             if(ref $res) {
@@ -204,125 +205,6 @@ sub connect {
     return $cv;
 }
 
-sub anyevent_read_type {
-    my(undef, $cb) = @_;
-
-    sub {
-        my($hd) = @_;
-
-        return unless defined $hd->{rbuf};
-
-        if($hd->{rbuf} =~ /^[-+:]/) {
-            $hd->{rbuf} =~ s/^([-+:])([^\015\012]*)\015?\012// or return;
-
-            $cb->($2, $1 eq '-');
-
-            return 1;
-
-        } elsif($hd->{rbuf} =~ /^\$/) {
-            $hd->{rbuf} =~ s/^\$([-0-9]+)\015?\012// or return;
-            my $len = $1;
-
-            if($len < 0) {
-                $cb->(undef);
-            } elsif($len + 2 <= length $hd->{rbuf}) {
-                $cb->(substr $hd->{rbuf}, 0, $len);
-                # Remove ending newline
-                substr $hd->{rbuf}, 0, $len + 2, "";
-            } else {
-                $hd->unshift_read (chunk => $len + 2, sub {
-                        $cb->(substr $_[1], 0, $len);
-                    });
-            }
-
-            return 1;
-
-        } elsif($hd->{rbuf} =~ /^\*/) {
-
-            $hd->{rbuf} =~ s/^\*([-0-9]+)\015?\012// or return;
-            my $size = $1;
-            warn "expecting $size values" if DEBUG;
-
-            my @lines;
-
-            my $reader; $reader = sub {
-                my($hd, $async) = @_;
-
-                while(@lines < $size) {
-                    if($hd->{rbuf} =~ /^([\$\-+:])([^\012\015]+)\015?\012/) {
-                        my $type = $1;
-                        my $line = $2;
-
-                        if($type =~ /[-+:]/) {
-                            $hd->{rbuf} =~ s/^[^\012\015]+\015?\012//;
-                            push @lines, $line;
-                        } elsif($line < 0) {
-                            $hd->{rbuf} =~ s/^[^\012\015]+\015?\012//;
-                            push @lines, undef;
-
-                        } elsif((1 + length($2) + 2 # Initial line
-                                 + $line + 2)       # Data and newline
-                                <= length $hd->{rbuf}) {
-                            $hd->{rbuf} =~ s/^[^\012\015]+\015?\012//;
-                            push @lines, substr $hd->{rbuf}, 0, $line, "";
-                            $hd->{rbuf} =~ s/^\015?\012//;
-
-                        } else {
-                            # Data not buffered, so we need to do this async
-                            $hd->unshift_read($reader) if $async;
-                            return $async;
-                        }
-                    } elsif($hd->{rbuf} =~ /^\*/) { # Nested
-                        my $reader_closure = $reader; # Need to avoid holding circular ref
-
-                        $hd->unshift_read(__PACKAGE__, sub {
-                                push @lines, $_[0];
-
-                                if(@lines == $size) {
-                                    warn "$size nested values" if DEBUG;
-                                    $cb->(\@lines);
-                                    undef $reader_closure;
-                                } else {
-                                    $hd->unshift_read($reader_closure);
-                                }
-                                return 1;
-                            });
-
-                        undef $reader;
-                        return 1;
-                    } else {
-                        $hd->unshift_read($reader) if $async;
-                        return $async;
-                    }
-                }
-
-                if($size < 0 || @lines == $size) {
-                    warn "Got $size values" if DEBUG;
-                    $cb->($size < 0 ? undef : \@lines);
-                    undef $reader;
-                    return 1;
-                }
-
-                die "unreachable";
-            };
-
-            return $reader->($hd, 1);
-
-        } elsif(length $hd->{rbuf}) {
-            # remove extra lines
-            $hd->{rbuf} =~ s/^\015?\012//g;
-
-            if(length $hd->{rbuf}) {
-                # Unknown
-                $cb->("Unknown type", 1);
-                return 1;
-            }
-        }
-
-        return;
-    }
-}
-
 1;
 __END__
 
@@ -358,7 +240,9 @@ AnyEvent::Redis - Non-blocking Redis client
 
 =head1 DESCRIPTION
 
-AnyEvent::Redis is a non-blocking Redis client using AnyEvent.
+AnyEvent::Redis is a non-blocking (event-driven) Redis client.
+
+This module is an AnyEvent user; you must install and use a supported event loop.
 
 =head1 METHODS
 
@@ -366,7 +250,7 @@ All methods supported by your version of Redis should be supported.
 
 =head2 Normal commands
 
-There are two alternative approaches for handling results from commands.
+There are two alternative approaches for handling results from commands:
 
 =over 4
 
@@ -376,10 +260,20 @@ There are two alternative approaches for handling results from commands.
     # arguments to command
   );
 
+  # Then...
+  my $res;
+  eval { 
+      # Could die()
+      $res = $cv->recv;
+  }; 
+  warn $@ if $@;
+
+  # or...
   $cv->cb(sub {
     my($cv) = @_;
     my($result, $err) = $cv->recv
   });
+
 
 =item * Callback:
 
@@ -459,6 +353,8 @@ Joshua Barratt
 Jeremy Zawodny
 
 Leon Brocard
+
+Michael S. Fischer
 
 =head1 SEE ALSO
 

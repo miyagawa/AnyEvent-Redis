@@ -23,13 +23,16 @@ SYNOPSIS
       $cv->cb(sub { my $value = $_[0]->recv });
 
 DESCRIPTION
-    AnyEvent::Redis is a non-blocking Redis client using AnyEvent.
+    AnyEvent::Redis is a non-blocking (event-driven) Redis client.
+
+    This module is an AnyEvent user; you must install and use a supported
+    event loop.
 
 METHODS
     All methods supported by your version of Redis should be supported.
 
   Normal commands
-    There are two alternative approaches for handling results from commands.
+    There are two alternative approaches for handling results from commands:
 
     *   AnyEvent::CondVar based:
 
@@ -37,6 +40,15 @@ METHODS
             # arguments to command
           );
 
+          # Then...
+          my $res;
+          eval { 
+              # Could die()
+              $res = $cv->recv;
+          }; 
+          warn $@ if $@;
+
+          # or...
           $cv->cb(sub {
             my($cv) = @_;
             my($result, $err) = $cv->recv
@@ -110,6 +122,8 @@ AUTHORS
     Jeremy Zawodny
 
     Leon Brocard
+
+    Michael S. Fischer
 
 SEE ALSO
     Redis, AnyEvent
