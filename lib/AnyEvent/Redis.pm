@@ -101,16 +101,19 @@ sub connect {
                 $cb = pop if ref $_[-1] eq 'CODE';
             }
 
-            my $send = join("\r\n",
-                  "*" . (1 + @_),
-                  map(('$' . length $_ => $_), uc($command), @_))
-                . "\r\n";
+            { 
+                use bytes;
+                my $send = join("\r\n",
+                      "*" . (1 + @_),
+                      map(('$' . length $_ => $_), uc($command), @_))
+                    . "\r\n";
 
-            warn $send if DEBUG;
+                warn $send if DEBUG;
 
-            $cv ||= AE::cv;
+                $cv ||= AE::cv;
 
-            $hd->push_write($send);
+                $hd->push_write($send);
+            }
 
             # Are we already subscribed to anything?
             if($self->{sub} && %{$self->{sub}}) {

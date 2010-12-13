@@ -1,9 +1,12 @@
 Revision history for Perl extension AnyEvent::Redis
 
-0.23_01  Sun Dec 12 15:25:47 PST 2010
-         - New read handler, about 10% faster (mfischer)
-         - Moved read handler to AnyEvent::Redis::Protocol (mfischer)
-         - Updated documentation (mfischer)
+0.23_01  Sun Dec 12 18:18:13 PST 2010
+         - UTF-8 safe (mfischer)
+	   - You have to manually decode the returned raw bytes in your read
+	     callback, though, since Redis doesn't store encoding context
+	 - New read handler, about 10% faster (mfischer)
+	 - Moved read handler to AnyEvent::Redis::Protocol (mfischer)
+	 - Updated documentation (mfischer)
 
 0.22  Sun Oct 31 20:38:52 PDT 2010
         - Fixed memory leaks with MULTI commands (dgl)

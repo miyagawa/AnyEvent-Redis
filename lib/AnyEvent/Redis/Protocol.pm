@@ -4,12 +4,12 @@ use common::sense;
 
 =head1 NAME
 
-AnyEvent::Redis2::Protocol - generates and parses Redis messages
+AnyEvent::Redis2::Protocol - Redis response parser (read handler) for AnyEvent
 
 =head1 DESCRIPTION
 
-This package should not be directly used.  It provides AnyEvent write and read
-types capable of generating Redis requests and parsing replies.
+This package should not be directly used.  It provides an AnyEvent read handler
+capable of parsing Redis responses.
 
 =head1 SEE ALSO
 
