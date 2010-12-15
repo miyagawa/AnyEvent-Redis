@@ -267,8 +267,8 @@ Optional.  The server port.
 =item encoding => <ENCODING>
 
 Optional.  Encode and decode data (when storing and retrieving, respectively)
-according to I<ENCODING> (see L<Encode> for details on possible I<ENCODING>
-values).  
+according to I<ENCODING> (C<"utf8"> is recommended or see L<Encode::Supported>
+for details on possible I<ENCODING> values).
 
 Omit if you intend to handle raw binary data with this connection.
 
@@ -393,6 +393,6 @@ Michael S. Fischer
 
 =head1 SEE ALSO
 
-L<Redis>, L<AnyEvent>, L<Encode>
+L<Redis>, L<AnyEvent>
 
 =cut
