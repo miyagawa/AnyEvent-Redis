@@ -22,7 +22,6 @@ Redis Protocol Specification L<http://code.google.com/p/redis/wiki/ProtocolSpeci
 sub anyevent_read_type {
     my ($handle, $cb) = @_;
     return sub {
-        use bytes;
         $handle->push_read(line => sub {
             my $line = $_[1];
             my $type = substr($line, 0, 1);

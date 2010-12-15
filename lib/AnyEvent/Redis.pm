@@ -80,6 +80,8 @@ sub connect {
               return
             };
 
+        binmode $fh; # ensure bytes until we decode
+
         my $hd = AnyEvent::Handle->new(
             fh => $fh,
             on_error => sub { $_[0]->destroy;
