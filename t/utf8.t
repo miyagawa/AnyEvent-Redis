@@ -4,7 +4,6 @@ use t::Redis;
 
 test_redis {
     my $r = shift;
-    $r->{encoding} = 'utf8';
 
     $r->all_cv->begin(sub { $_[0]->send });
 
@@ -31,7 +30,13 @@ test_redis {
 
     $r->all_cv->end;
     $r->all_cv->recv;
-};
+
+    eval { AnyEvent::Redis->new(encoding => "invalid") };
+    like $@, qr/Encoding "invalid" not found/;
+
+}
+# Extra args for the constructor
+  { encoding => "utf8" };
 
 done_testing;
 

@@ -11,7 +11,7 @@ use AnyEvent::Socket;
 use AnyEvent::Redis::Protocol;
 use Try::Tiny;
 use Carp qw(croak);
-use Encode;
+use Encode ();
 
 our $AUTOLOAD;
 
@@ -20,6 +20,11 @@ sub new {
 
     my $host = delete $args{host} || '127.0.0.1';
     my $port = delete $args{port} || 6379;
+
+    if (my $encoding = $args{encoding}) {
+        $args{encoding} = Encode::find_encoding($encoding);
+        croak qq{Encoding "$encoding" not found} unless ref $args{encoding};
+    }
 
     bless {
         host => $host,
@@ -107,9 +112,9 @@ sub connect {
 
             my $send = join("\r\n",
                   "*" . (1 + @_),
-                  map { ('$' . length $_ => $_) } 
-                        (uc($command), map { $self->{encoding} 
-                                             ? encode($self->{encoding}, $_) 
+                  map { ('$' . length $_ => $_) }
+                        (uc($command), map { $self->{encoding} && $_
+                                             ? $self->{encoding}->encode($_)
                                              : $_ } @_))
                 . "\r\n";
 

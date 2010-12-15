@@ -1,7 +1,6 @@
 package AnyEvent::Redis::Protocol;
 
 use common::sense;
-use Encode;
 
 =head1 NAME
 
@@ -21,6 +20,7 @@ Redis Protocol Specification L<http://code.google.com/p/redis/wiki/ProtocolSpeci
 
 sub anyevent_read_type {
     my ($handle, $cb) = @_;
+
     return sub {
         $handle->push_read(line => sub {
             my $line = $_[1];
@@ -53,7 +53,7 @@ sub anyevent_read_type {
                                     # Delete the bulk header.
                                     substr($handle->{rbuf}, 0, length($match), '');
                                     my $value = substr($handle->{rbuf}, 0, $vallen, '');
-                                    $value = decode($handle->{encoding}, $value) 
+                                    $value = $handle->{encoding}->decode($value) 
                                         if $handle->{encoding};
                                     push @$results, $value;
                                     # Delete trailing data characters.
@@ -118,7 +118,7 @@ sub anyevent_read_type {
                     $handle->unshift_read(chunk => $length + 2, sub {
                         my $data = $_[1];
                         my $value = substr($data, 0, $length);
-                        $value = decode($handle->{encoding}, $value)
+                        $value = $handle->{encoding}->decode($value)
                             if $handle->{encoding};
                         $cb->($value);
                     });
