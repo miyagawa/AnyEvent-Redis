@@ -11,6 +11,7 @@ use AnyEvent::Socket;
 use AnyEvent::Redis::Protocol;
 use Try::Tiny;
 use Carp qw(croak);
+use Encode;
 
 our $AUTOLOAD;
 
@@ -89,6 +90,7 @@ sub connect {
             on_eof   => sub { $_[0]->destroy;
                               $self->cleanup('connection closed');
                           },
+            encoding => $self->{encoding},
         );
 
         $self->{cmd_cb} = sub {
@@ -101,19 +103,19 @@ sub connect {
                 $cb = pop if ref $_[-1] eq 'CODE';
             }
 
-            { 
-                use bytes;
-                my $send = join("\r\n",
-                      "*" . (1 + @_),
-                      map(('$' . length $_ => $_), uc($command), @_))
-                    . "\r\n";
+            my $send = join("\r\n",
+                  "*" . (1 + @_),
+                  map { ('$' . length $_ => $_) } 
+                        (uc($command), map { $self->{encoding} 
+                                             ? encode($self->{encoding}, $_) 
+                                             : $_ } @_))
+                . "\r\n";
 
-                warn $send if DEBUG;
+            warn $send if DEBUG;
 
-                $cv ||= AE::cv;
+            $cv ||= AE::cv;
 
-                $hd->push_write($send);
-            }
+            $hd->push_write($send);
 
             # Are we already subscribed to anything?
             if($self->{sub} && %{$self->{sub}}) {
@@ -148,7 +150,7 @@ sub connect {
 
                         $self->all_cv->end;
                         $err ? $cv->croak($res) : $cv->send($res);
-                    });
+                });
 
             } else {
                 croak "Must provide a CODE reference for subscriptions" unless $cb;
@@ -226,6 +228,7 @@ AnyEvent::Redis - Non-blocking Redis client
   my $redis = AnyEvent::Redis->new(
       host => '127.0.0.1',
       port => 6379,
+      encoding => 'utf8',
       on_error => sub { warn @_ },
   );
 
@@ -246,6 +249,35 @@ AnyEvent::Redis - Non-blocking Redis client
 AnyEvent::Redis is a non-blocking (event-driven) Redis client.
 
 This module is an AnyEvent user; you must install and use a supported event loop.
+
+=head1 ESTABLISHING A CONNECTION
+
+To create a new connection, use the new() method with the following attributes:
+
+=over
+
+=item host => <HOSTNAME>
+
+B<Required.>  The hostname or literal address of the server.  
+
+=item port => <PORT>
+
+Optional.  The server port.
+
+=item encoding => <ENCODING>
+
+Optional.  Encode and decode data (when storing and retrieving, respectively)
+according to I<ENCODING> (see L<Encode> for details on possible I<ENCODING>
+values).  
+
+Omit if you intend to handle raw binary data with this connection.
+
+=item on_error => $cb->($errmsg)
+
+Optional.  Callback that will be fired if a connection or database-level error
+occurs.  The error message will be passed to the callback as the sole argument.
+
+=back
 
 =head1 METHODS
 
@@ -361,6 +393,6 @@ Michael S. Fischer
 
 =head1 SEE ALSO
 
-L<Redis>, L<AnyEvent>
+L<Redis>, L<AnyEvent>, L<Encode>
 
 =cut

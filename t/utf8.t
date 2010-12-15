@@ -1,10 +1,10 @@
 use strict;
 use Test::More;
 use t::Redis;
-use utf8;
 
 test_redis {
     my $r = shift;
+    $r->{encoding} = 'utf8';
 
     $r->all_cv->begin(sub { $_[0]->send });
 
@@ -12,11 +12,21 @@ test_redis {
     is ref $info, 'HASH';
     ok $info->{redis_version};
 
-    $r->set("foo", "ba∫∫", sub { pass "SET foo" });
-    $r->get("foo", sub { 
-            is length $_[0], 8, "stored 8 bytes";
-            utf8::decode($_[0]); 
-            is $_[0], "ba∫∫" 
+    { 
+        use utf8;
+        my $key = "ロジ プロセスド";
+        my $val = "लचकनहि";
+        $r->set($key => $val, sub { pass "SET literal key" });
+        $r->get($key, sub { 
+                is $_[0], $val;
+        });
+    }
+
+    my $key = "\x{a3}\x{acd}";
+    my $val = "\x{90e}\x{60a}";
+    $r->set($key => $val, sub { pass "SET escaped key" });
+    $r->get($key, sub { 
+            is $_[0], $val;
     });
 
     $r->all_cv->end;
@@ -25,4 +35,4 @@ test_redis {
 
 done_testing;
 
-
+# vim:fileencoding=utf8

@@ -1,6 +1,7 @@
 package AnyEvent::Redis::Protocol;
 
 use common::sense;
+use Encode;
 
 =head1 NAME
 
@@ -52,7 +53,10 @@ sub anyevent_read_type {
                                     # OK, we have enough in our buffer.
                                     # Delete the bulk header.
                                     substr($handle->{rbuf}, 0, length($match), '');
-                                    push @$results, substr($handle->{rbuf}, 0, $vallen, '');
+                                    my $value = substr($handle->{rbuf}, 0, $vallen, '');
+                                    $value = decode($handle->{encoding}, $value) 
+                                        if $handle->{encoding};
+                                    push @$results, $value;
                                     # Delete trailing data characters.
                                     substr($handle->{rbuf}, 0, 2, '');
                                     unless (--$remaining) {
@@ -106,14 +110,18 @@ sub anyevent_read_type {
                 $cb->($value, 1);
             } elsif ($type eq '$') {
                 # Bulk reply
-                if ($value == -1) {
+                my $length = $value;
+                if ($length == -1) {
                     $cb->(undef);
                 } else {
                     # We need to read 2 bytes more than the length (stupid 
                     # CRLF framing).  Then we need to discard them.
-                    $handle->unshift_read(chunk => $value + 2, sub {
+                    $handle->unshift_read(chunk => $length + 2, sub {
                         my $data = $_[1];
-                        $cb->(substr($data, 0, $value));
+                        my $value = substr($data, 0, $length);
+                        $value = decode($handle->{encoding}, $value)
+                            if $handle->{encoding};
+                        $cb->($value);
                     });
                 }
             }
