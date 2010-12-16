@@ -8,8 +8,9 @@ use FindBin;
 use base qw(Exporter);
 our @EXPORT = qw(test_redis);
 
-sub test_redis(&) {
+sub test_redis(&;$) {
     my $cb = shift;
+    my $args = shift;
 
     chomp(my $redis_server = `which redis-server`);
     unless ($redis_server && -e $redis_server && -x _) {
@@ -24,7 +25,11 @@ sub test_redis(&) {
         },
         client => sub {
             my $port = shift;
-            my $r = AnyEvent::Redis->new(host => "127.0.0.1", port => $port);
+            my $r = AnyEvent::Redis->new(
+                host => "127.0.0.1",
+                port => $port,
+                ref $args ? %$args : ()
+            );
             $cb->($r, $port);
         };
 }

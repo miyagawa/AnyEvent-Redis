@@ -11,7 +11,7 @@ use AnyEvent::Socket;
 use AnyEvent::Redis::Protocol;
 use Try::Tiny;
 use Carp qw(croak);
-use Encode;
+use Encode ();
 
 our $AUTOLOAD;
 
@@ -20,6 +20,11 @@ sub new {
 
     my $host = delete $args{host} || '127.0.0.1';
     my $port = delete $args{port} || 6379;
+
+    if (my $encoding = $args{encoding}) {
+        $args{encoding} = Encode::find_encoding($encoding);
+        croak qq{Encoding "$encoding" not found} unless ref $args{encoding};
+    }
 
     bless {
         host => $host,
@@ -80,6 +85,8 @@ sub connect {
               return
             };
 
+        binmode $fh; # ensure bytes until we decode
+
         my $hd = AnyEvent::Handle->new(
             fh => $fh,
             on_error => sub { $_[0]->destroy;
@@ -105,9 +112,9 @@ sub connect {
 
             my $send = join("\r\n",
                   "*" . (1 + @_),
-                  map { ('$' . length $_ => $_) } 
-                        (uc($command), map { $self->{encoding} 
-                                             ? encode($self->{encoding}, $_) 
+                  map { ('$' . length $_ => $_) }
+                        (uc($command), map { $self->{encoding} && $_
+                                             ? $self->{encoding}->encode($_)
                                              : $_ } @_))
                 . "\r\n";
 
@@ -267,8 +274,8 @@ Optional.  The server port.
 =item encoding => <ENCODING>
 
 Optional.  Encode and decode data (when storing and retrieving, respectively)
-according to I<ENCODING> (see L<Encode> for details on possible I<ENCODING>
-values).  
+according to I<ENCODING> (C<"utf8"> is recommended or see L<Encode::Supported>
+for details on possible I<ENCODING> values).
 
 Omit if you intend to handle raw binary data with this connection.
 
@@ -393,6 +400,6 @@ Michael S. Fischer
 
 =head1 SEE ALSO
 
-L<Redis>, L<AnyEvent>, L<Encode>
+L<Redis>, L<AnyEvent>
 
 =cut
