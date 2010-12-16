@@ -113,7 +113,7 @@ sub connect {
             my $send = join("\r\n",
                   "*" . (1 + @_),
                   map { ('$' . length $_ => $_) }
-                        (uc($command), map { $self->{encoding} && $_
+                        (uc($command), map { $self->{encoding} && length($_)
                                              ? $self->{encoding}->encode($_)
                                              : $_ } @_))
                 . "\r\n";

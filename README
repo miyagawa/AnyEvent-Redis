@@ -7,6 +7,7 @@ SYNOPSIS
       my $redis = AnyEvent::Redis->new(
           host => '127.0.0.1',
           port => 6379,
+          encoding => 'utf8',
           on_error => sub { warn @_ },
       );
 
@@ -27,6 +28,28 @@ DESCRIPTION
 
     This module is an AnyEvent user; you must install and use a supported
     event loop.
+
+ESTABLISHING A CONNECTION
+    To create a new connection, use the new() method with the following
+    attributes:
+
+    host => <HOSTNAME>
+        Required. The hostname or literal address of the server.
+
+    port => <PORT>
+        Optional. The server port.
+
+    encoding => <ENCODING>
+        Optional. Encode and decode data (when storing and retrieving,
+        respectively) according to *ENCODING* ("utf8" is recommended or see
+        Encode::Supported for details on possible *ENCODING* values).
+
+        Omit if you intend to handle raw binary data with this connection.
+
+    on_error => $cb->($errmsg)
+        Optional. Callback that will be fired if a connection or
+        database-level error occurs. The error message will be passed to the
+        callback as the sole argument.
 
 METHODS
     All methods supported by your version of Redis should be supported.

@@ -54,7 +54,7 @@ sub anyevent_read_type {
                                     substr($handle->{rbuf}, 0, length($match), '');
                                     my $value = substr($handle->{rbuf}, 0, $vallen, '');
                                     $value = $handle->{encoding}->decode($value) 
-                                        if $handle->{encoding};
+                                        if $handle->{encoding} && $vallen;
                                     push @$results, $value;
                                     # Delete trailing data characters.
                                     substr($handle->{rbuf}, 0, 2, '');
@@ -119,7 +119,7 @@ sub anyevent_read_type {
                         my $data = $_[1];
                         my $value = substr($data, 0, $length);
                         $value = $handle->{encoding}->decode($value)
-                            if $handle->{encoding};
+                            if $handle->{encoding} && $length;
                         $cb->($value);
                     });
                 }
