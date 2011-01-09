@@ -361,8 +361,7 @@ connection with an active subscription are subscribe and unsubscribe commands.
 
 =back
 
-The Redis command reference
-(L<http://code.google.com/p/redis/wiki/CommandReference>) lists all commands
+The Redis command reference (L<http://redis.io/commands>) lists all commands
 Redis supports.
 
 =head1 REQUIREMENTS

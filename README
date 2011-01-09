@@ -115,8 +115,7 @@ METHODS
 
     *   lpop
 
-    The Redis command reference
-    (<http://code.google.com/p/redis/wiki/CommandReference>) lists all
+    The Redis command reference (<http://redis.io/commands>) lists all
     commands Redis supports.
 
 REQUIREMENTS

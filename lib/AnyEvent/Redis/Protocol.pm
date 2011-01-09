@@ -14,7 +14,7 @@ capable of parsing Redis responses.
 =head1 SEE ALSO
 
 L<AnyEvent::Handle>,
-Redis Protocol Specification L<http://code.google.com/p/redis/wiki/ProtocolSpecification>
+Redis Protocol Specification L<http://redis.io/topics/protocol>
 
 =cut
 
