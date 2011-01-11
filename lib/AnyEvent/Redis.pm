@@ -70,7 +70,8 @@ sub connect {
 
     my $cv;
     if (@_) {
-        $cv = AE::cv;
+        $cv = pop if UNIVERSAL::isa($_[-1], 'AnyEvent::CondVar');
+        $cv ||= AE::cv;
         push @{$self->{connect_queue}}, [ $cv, @_ ];
     }
 
@@ -109,6 +110,7 @@ sub connect {
                 $cv = pop if UNIVERSAL::isa($_[-1], 'AnyEvent::CondVar');
                 $cb = pop if ref $_[-1] eq 'CODE';
             }
+            $cv ||= AE::cv;
 
             my $send = join("\r\n",
                   "*" . (1 + @_),
@@ -119,8 +121,6 @@ sub connect {
                 . "\r\n";
 
             warn $send if DEBUG;
-
-            $cv ||= AE::cv;
 
             $hd->push_write($send);
 
