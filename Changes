@@ -1,5 +1,8 @@
 Revision history for Perl extension AnyEvent::Redis
 
+0.23  Wed 12 Jan 2011 23:34:58 GMT
+         - Fix to always allow condvar as final param (chip)
+
 0.23_01  Wed Dec 15 20:17:42 PST 2010
          - Added character encoding support (mfischer, dgl)
 	 - New read handler, about 10% faster (mfischer)
