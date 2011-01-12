@@ -1,6 +1,7 @@
 package AnyEvent::Redis::Protocol;
 
-use common::sense;
+use strict;
+use warnings;
 
 =head1 NAME
 
@@ -98,7 +99,7 @@ sub anyevent_read_type {
                                 $need_more_data = 1;
                             }
                         } until $need_more_data;
-                        return undef; # get more data
+                        return; # get more data
                     });
                 }
             } elsif ($type eq '+' || $type eq ':') {
