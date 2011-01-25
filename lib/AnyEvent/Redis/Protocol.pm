@@ -5,7 +5,7 @@ use warnings;
 
 =head1 NAME
 
-AnyEvent::Redis2::Protocol - Redis response parser (read handler) for AnyEvent
+AnyEvent::Redis::Protocol - Redis response parser (read handler) for AnyEvent
 
 =head1 DESCRIPTION
 
@@ -70,13 +70,13 @@ sub anyevent_read_type {
                                 my ($type, $value) = ($1, $2);
                                 if ($type eq '+' || $type eq ':') {
                                     push @$results, $value;
-                                    unless (--$remaining) {
-                                        $cb->($results);
-                                        return 1;
-                                    }
                                 } elsif ($type eq '-') {
-                                    # Error - abort early
-                                    $cb->($value, 1);
+                                    # Embedded error; this seems possible only in EXEC answer,
+                                    #  so include error in results; don't abort parsing
+                                    push @$results, bless \$value, 'AnyEvent::Redis::Error';
+                                }
+                                unless (--$remaining) {
+                                    $cb->($results);
                                     return 1;
                                 }
                             } elsif (substr($handle->{rbuf}, 0, 1) eq '*') {
