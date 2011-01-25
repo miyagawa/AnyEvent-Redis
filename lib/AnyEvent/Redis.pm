@@ -162,7 +162,6 @@ sub connect {
                     if ($err || ref($res) ne 'ARRAY') {
                         $_->croak($res, 1) for $cv, @$mcvs;
                     } else {
-                        $DB::single++;
                         for my $i (0 .. $#$mcvs) {
                             my $r = $res->[$i];
                             ref($r) && UNIVERSAL::isa($r, 'AnyEvent::Redis::Error')
