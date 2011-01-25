@@ -124,13 +124,13 @@ sub connect {
             $hd->push_write($send);
 
             # Are we already subscribed to anything?
-            if($self->{sub} && %{$self->{sub}}) {
+            if ($self->{sub} && %{$self->{sub}}) {
 
-              croak "Use of non-pubsub command during pubsub session may result in unexpected behaviour"
-                unless $command =~ /^p?(?:un)?subscribe$/i;
+                croak "Use of non-pubsub command during pubsub session may result in unexpected behaviour"
+                  unless $command =~ /^p?(?:un)?subscribe$/i;
 
-              # Remember subscriptions
-              $self->{sub}->{$_} ||= [$cv, $cb] for @_;
+                # Remember subscriptions
+                $self->{sub}->{$_} ||= [$cv, $cb] for @_;
 
             } elsif ($command !~ /^p?subscribe$/i) {
 
@@ -169,37 +169,37 @@ sub connect {
                 my $res_cb; $res_cb = sub {
 
                     $hd->push_read("AnyEvent::Redis::Protocol" => sub {
-                            my($res, $err) = @_;
+                        my ($res, $err) = @_;
 
-                            if(ref $res) {
-                                my $action = lc $res->[0];
-                                warn "$action $res->[1]" if DEBUG;
+                        if (ref $res) {
+                            my $action = lc $res->[0];
+                            warn "$action $res->[1]" if DEBUG;
 
-                                if($action eq 'message') {
-                                    $self->{sub}->{$res->[1]}[1]->($res->[2], $res->[1]);
+                            if ($action eq 'message') {
+                                $self->{sub}->{$res->[1]}[1]->($res->[2], $res->[1]);
 
-                                } elsif($action eq 'pmessage') {
-                                    $self->{sub}->{$res->[1]}[1]->($res->[3], $res->[2], $res->[1]);
+                            } elsif ($action eq 'pmessage') {
+                                $self->{sub}->{$res->[1]}[1]->($res->[3], $res->[2], $res->[1]);
 
-                                } elsif($action eq 'subscribe' || $action eq 'psubscribe') {
-                                    $self->{sub_count} = $res->[2];
+                            } elsif ($action eq 'subscribe' || $action eq 'psubscribe') {
+                                $self->{sub_count} = $res->[2];
 
-                                } elsif($action eq 'unsubscribe' || $action eq 'punsubscribe') {
-                                    $self->{sub_count} = $res->[2];
-                                    $self->{sub}->{$res->[1]}[0]->send;
-                                    delete $self->{sub}->{$res->[1]};
-                                    $self->all_cv->end;
+                            } elsif ($action eq 'unsubscribe' || $action eq 'punsubscribe') {
+                                $self->{sub_count} = $res->[2];
+                                $self->{sub}->{$res->[1]}[0]->send;
+                                delete $self->{sub}->{$res->[1]};
+                                $self->all_cv->end;
 
-                                } else {
-                                    warn "Unknown pubsub action: $action";
-                                }
+                            } else {
+                                warn "Unknown pubsub action: $action";
                             }
+                        }
 
-                            if($self->{sub_count} || %{$self->{sub}}) {
-                                # Carry on reading while we are subscribed
-                                $res_cb->();
-                            }
-                        });
+                        if ($self->{sub_count} || %{$self->{sub}}) {
+                            # Carry on reading while we are subscribed
+                            $res_cb->();
+                        }
+                    });
                 };
 
                 $res_cb->();
