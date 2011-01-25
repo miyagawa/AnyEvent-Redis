@@ -9,7 +9,6 @@ use AnyEvent;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
 use AnyEvent::Redis::Protocol;
-use Try::Tiny;
 use Carp qw(croak);
 use Encode ();
 
@@ -137,26 +136,28 @@ sub connect {
 
                 $cv->cb(sub {
                     my $cv = shift;
-                    try {
+                    local $@;
+                    eval {
                         my $res = $cv->recv;
                         $cb->($res);
-                    } catch {
-                        ($self->{on_error} || sub { die @_ })->($_);
+                    };
+                    if ($@) {
+                        ($self->{on_error} || sub { die @_ })->(my $err = $@);
                     }
                 }) if $cb;
 
                 $hd->push_read("AnyEvent::Redis::Protocol" => sub {
-                        my($res, $err) = @_;
+                    my ($res, $err) = @_;
 
-                        if($command eq 'info') {
-                          $res = { map { split /:/, $_, 2 } split /\r\n/, $res };
-                        } elsif($command eq 'keys' && !ref $res) {
-                          # Older versions of Redis (1.2) need this
-                          $res = [split / /, $res];
-                        }
+                    if ($command eq 'info') {
+                        $res = { map { split /:/, $_, 2 } split /\r\n/, $res };
+                    } elsif ($command eq 'keys' && !ref $res) {
+                        # Older versions of Redis (1.2) need this
+                        $res = [split / /, $res];
+                    }
 
-                        $self->all_cv->end;
-                        $err ? $cv->croak($res) : $cv->send($res);
+                    $self->all_cv->end;
+                    $err ? $cv->croak($res) : $cv->send($res);
                 });
 
             } else {
