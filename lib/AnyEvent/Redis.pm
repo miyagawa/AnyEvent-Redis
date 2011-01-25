@@ -51,10 +51,7 @@ sub AUTOLOAD {
 sub all_cv {
     my $self = shift;
     $self->{all_cv} = shift if @_;
-    unless ($self->{all_cv}) {
-        $self->{all_cv} = AE::cv;
-    }
-    $self->{all_cv};
+    $self->{all_cv} ||= AE::cv;
 }
 
 sub cleanup {
@@ -90,9 +87,7 @@ sub connect {
         my $hd = AnyEvent::Handle->new(
             fh => $fh,
             on_error => sub { $_[0]->destroy;
-                              if ($_[1]) {
-                                  $self->cleanup($_[2]);
-                              }
+                              $self->cleanup($_[2]) if $_[1];
                           },
             on_eof   => sub { $_[0]->destroy;
                               $self->cleanup('connection closed');
@@ -101,15 +96,42 @@ sub connect {
         );
 
         $self->{cmd_cb} = sub {
-            $self->all_cv->begin;
-            my $command = shift;
+            my $command = lc shift;
+
+            # Are we already subscribed to anything?
+            if ($self->{sub} && %{$self->{sub}}) {
+                croak "Use of non-pubsub command during pubsub session may result in unexpected behaviour"
+                  unless $command =~ /^p?(?:un)?subscribe\z/;
+            }
+            if ($self->{multi_write}) {
+                croak "Use of pubsub or multi command in transaction is not supported"
+                  if $command =~ /^p?(?:un)?subscribe\z|^multi\z/;
+            } else {
+                croak "Can't 'exec' a transaction because none is pending"
+                  if $command eq 'exec';
+            }
 
             my($cv, $cb);
             if (@_) {
-                $cv = pop if UNIVERSAL::isa($_[-1], 'AnyEvent::CondVar');
+                $cv = pop if ref $_[-1] && UNIVERSAL::isa($_[-1], 'AnyEvent::CondVar');
                 $cb = pop if ref $_[-1] eq 'CODE';
             }
             $cv ||= AE::cv;
+            if ($cb && $command !~ /^p?subscribe\z/) {
+                $cv->cb(sub {
+                    my $cv = shift;
+                    local $@;
+                    eval {
+                        my $res = $cv->recv;
+                        $cb->($res);
+                    };
+                    if ($@) {
+                        ($self->{on_error} || sub { die @_ })->(my $err = $@);
+                    }
+                });
+            }
+
+            $self->all_cv->begin;
 
             my $send = join("\r\n",
                   "*" . (1 + @_),
@@ -123,28 +145,49 @@ sub connect {
 
             $hd->push_write($send);
 
-            # Are we already subscribed to anything?
             if ($self->{sub} && %{$self->{sub}}) {
-
-                croak "Use of non-pubsub command during pubsub session may result in unexpected behaviour"
-                  unless $command =~ /^p?(?:un)?subscribe$/i;
 
                 # Remember subscriptions
                 $self->{sub}->{$_} ||= [$cv, $cb] for @_;
 
-            } elsif ($command !~ /^p?subscribe$/i) {
+            } elsif ($command eq 'exec') {
 
-                $cv->cb(sub {
-                    my $cv = shift;
-                    local $@;
-                    eval {
-                        my $res = $cv->recv;
-                        $cb->($res);
-                    };
-                    if ($@) {
-                        ($self->{on_error} || sub { die @_ })->(my $err = $@);
+                # at end of transaction, expect bulk reply possibly including errors
+                $hd->push_read("AnyEvent::Redis::Protocol" => sub {
+                    my ($res, $err) = @_;
+
+                    $self->all_cv->end;
+                    my $mcvs = delete $self->{multi_cvs} || [];
+
+                    if ($err || ref($res) ne 'ARRAY') {
+                        $_->croak($res, 1) for $cv, @$mcvs;
+                    } else {
+                        $DB::single++;
+                        for my $i (0 .. $#$mcvs) {
+                            my $r = $res->[$i];
+                            ref($r) && UNIVERSAL::isa($r, 'AnyEvent::Redis::Error')
+                              ? $mcvs->[$i]->croak($$r)
+                              : $mcvs->[$i]->send($r);
+                        }
+                        $cv->send($res);
                     }
-                }) if $cb;
+                });
+
+                delete $self->{multi_write};
+
+            } elsif ($self->{multi_write}) {
+
+                # in transaction, expect only "QUEUED"
+                $hd->push_read("AnyEvent::Redis::Protocol" => sub {
+                    my ($res, $err) = @_;
+
+                    $self->all_cv->end;
+                    $err || $res ne 'QUEUED'
+                      ? $cv->croak($res)
+                      : push @{$self->{multi_cvs}}, $cv;
+                });
+
+            } elsif ($command !~ /^p?subscribe\z/) {
 
                 $hd->push_read("AnyEvent::Redis::Protocol" => sub {
                     my ($res, $err) = @_;
@@ -159,6 +202,8 @@ sub connect {
                     $self->all_cv->end;
                     $err ? $cv->croak($res) : $cv->send($res);
                 });
+
+                $self->{multi_write} = 1 if $command eq 'multi';
 
             } else {
                 croak "Must provide a CODE reference for subscriptions" unless $cb;
