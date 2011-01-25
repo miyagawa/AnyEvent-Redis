@@ -15,17 +15,21 @@ test_redis {
         });
 
       # Simple multi/exec
+      my $nsets = 0;
       $r->multi;
-      $r->set("foo$_" => "bar$_") for 1 .. 10;
+      $r->set("foo$_" => "bar$_", sub { ++$nsets }) for 1 .. 10;
       $r->exec(sub {
           ok 10 == grep /^OK$/, @{$_[0]};
+	  ok 10 == $nsets;
         });
 
       # Complex multi/exec
 
+      my $y;
+      my $get5 = sub { ok 5 == grep { $y++; /^bar$y$/ } @{$_[0]} };
       $r->multi;
-      $r->mget(map { "foo$_" } 1 .. 5);
-      $r->mget(map { "foo$_" } 6 .. 10);
+      $r->mget((map { "foo$_" } 1 ..  5), $get5);
+      $r->mget((map { "foo$_" } 6 .. 10), $get5);
       $r->exec(sub {
           my $x = 0;
           ok 10 == grep { $x++; /^bar$x$/ } map { @$_ } @{$_[0]};
