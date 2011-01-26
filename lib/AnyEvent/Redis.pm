@@ -374,6 +374,24 @@ There are two alternative approaches for handling results from commands:
 
 =back
 
+=head2 Transactions (MULTI/EXEC)
+
+Redis transactions begin with a "multi" command and end with an "exec"
+command.  Commands issued in between are not executed immediately; on
+receipt of the "exec", the server executes all commands atomically, and
+returns all the results as one bulk reply.  Therefore, by the time any of
+these callbacks is called, the entire transaction is finished for better or
+worse.
+
+After a transaction is finished, results for each individual command are
+reported in the usual way.  Results of the "exec" itself will be returned as
+an array reference containing all of the individual results.  This may in
+some cases make callbacks on the individual commands unnecessary, or vice
+versa.
+
+It is not permitted to nest transactions.  This module does not permit
+subscription-related commands in a transaction.
+
 =head2 Subscriptions
 
 The subscription methods (C<subscribe> and C<psubscribe>) must be used with a callback:
@@ -441,6 +459,8 @@ Jeremy Zawodny
 Leon Brocard
 
 Michael S. Fischer
+
+Chip Salzenberg
 
 =head1 SEE ALSO
 
