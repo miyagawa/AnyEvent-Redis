@@ -59,6 +59,13 @@ sub cleanup {
     delete $self->{cmd_cb};
     delete $self->{sock};
     $self->{on_error}->(@_) if $self->{on_error};
+    $self->{on_cleanup}->(@_) if $self->{on_cleanup};
+    my $ex = delete $self->{expected};
+    for (@$ex) {
+        eval { $_->croak(@_) };
+        warn "Exception in cleanup callback (ignored): $@" if $@;
+    }
+    return;
 }
 
 sub connect {
@@ -78,7 +85,8 @@ sub connect {
             or do {
               my $err = "Can't connect Redis server: $!";
               $self->cleanup($err);
-              $cv->croak($err);
+              eval { $cv->croak($err) };
+              warn "Exception in connect failure callback (ignored): $@" if $@;
               return
             };
 
@@ -97,6 +105,7 @@ sub connect {
 
         $self->{cmd_cb} = sub {
             my $command = lc shift;
+            my $not_subscribe = $command !~ /^p?subscribe\z/;
 
             # Are we already subscribed to anything?
             if ($self->{sub} && %{$self->{sub}}) {
@@ -117,7 +126,7 @@ sub connect {
                 $cb = pop if ref $_[-1] eq 'CODE';
             }
             $cv ||= AE::cv;
-            if ($cb && $command !~ /^p?subscribe\z/) {
+            if ($cb && $not_subscribe) {
                 $cv->cb(sub {
                     my $cv = shift;
                     local $@;
@@ -160,15 +169,22 @@ sub connect {
                     my $mcvs = delete $self->{multi_cvs} || [];
 
                     if ($err || ref($res) ne 'ARRAY') {
-                        $_->croak($res, 1) for $cv, @$mcvs;
+                        for ($cv, @$mcvs) {
+                            eval { $_->croak($res, 1) };
+                            warn "Exception in callback (ignored): $@" if $@;
+                        }
                     } else {
                         for my $i (0 .. $#$mcvs) {
                             my $r = $res->[$i];
-                            ref($r) && UNIVERSAL::isa($r, 'AnyEvent::Redis::Error')
-                              ? $mcvs->[$i]->croak($$r)
-                              : $mcvs->[$i]->send($r);
+                            eval {
+                                ref($r) && UNIVERSAL::isa($r, 'AnyEvent::Redis::Error')
+                                  ? $mcvs->[$i]->croak($$r)
+                                  : $mcvs->[$i]->send($r);
+                            };
+                            warn "Exception in callback (ignored): $@" if $@;
                         }
-                        $cv->send($res);
+                        eval { $cv->send($res) };
+                        warn "Exception in callback (ignored): $@" if $@;
                     }
                 });
 
@@ -181,12 +197,16 @@ sub connect {
                     my ($res, $err) = @_;
 
                     $self->all_cv->end;
-                    $err || $res ne 'QUEUED'
-                      ? $cv->croak($res)
-                      : push @{$self->{multi_cvs}}, $cv;
+                    if (!$err && $res eq 'QUEUED') {
+                        push @{$self->{multi_cvs}}, $cv;
+                    }
+                    else {
+                        eval { $cv->croak($res) };
+                        warn "Exception in callback (ignored): $@" if $@;
+                    }
                 });
 
-            } elsif ($command !~ /^p?subscribe\z/) {
+            } elsif ($not_subscribe) {
 
                 $hd->push_read("AnyEvent::Redis::Protocol" => sub {
                     my ($res, $err) = @_;
@@ -199,7 +219,8 @@ sub connect {
                     }
 
                     $self->all_cv->end;
-                    $err ? $cv->croak($res) : $cv->send($res);
+                    eval { $err ? $cv->croak($res) : $cv->send($res) };
+                    warn "Exception in callback (ignored): $@" if $@;
                 });
 
                 $self->{multi_write} = 1 if $command eq 'multi';
@@ -230,7 +251,8 @@ sub connect {
 
                             } elsif ($action eq 'unsubscribe' || $action eq 'punsubscribe') {
                                 $self->{sub_count} = $res->[2];
-                                $self->{sub}->{$res->[1]}[0]->send;
+                                eval { $self->{sub}->{$res->[1]}[0]->send };
+                                warn "Exception in callback (ignored): $@" if $@;
                                 delete $self->{sub}->{$res->[1]};
                                 $self->all_cv->end;
 
@@ -282,6 +304,7 @@ AnyEvent::Redis - Non-blocking Redis client
       port => 6379,
       encoding => 'utf8',
       on_error => sub { warn @_ },
+      on_cleanup => sub { warn "Connection closed: @_" },
   );
 
   # callback based
@@ -328,6 +351,12 @@ Omit if you intend to handle raw binary data with this connection.
 
 Optional.  Callback that will be fired if a connection or database-level error
 occurs.  The error message will be passed to the callback as the sole argument.
+
+=item on_cleanup => $cb->($errmsg)
+
+Optional.  Callback that will be fired if a connection error occurs.  The
+error message will be passed to the callback as the sole argument.  After
+this callback, errors will be reported for all outstanding requests.
 
 =back
 
