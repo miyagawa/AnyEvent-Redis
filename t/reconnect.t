@@ -10,6 +10,7 @@ test_redis {
 
     # should fail
     eval { $redis->info->recv; };
+    ok $@, "got exception from error";
 
     # fix the port and try again
     $redis->{port} = $port;
