@@ -9,6 +9,9 @@ use AnyEvent;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
 use AnyEvent::Redis::Protocol;
+# This is used by AnyEvent::Redis::Protocol, we leak the implementation though
+# as it needs to be passed this to keep state.
+use Protocol::Redis;
 use Carp qw(croak);
 use Encode ();
 
@@ -26,8 +29,9 @@ sub new {
     }
 
     bless {
-        host => $host,
-        port => $port,
+        host      => $host,
+        port      => $port,
+        _protocol => Protocol::Redis->new,
         %args,
     }, $class;
 }
@@ -153,7 +157,7 @@ sub connect {
             } elsif ($command eq 'exec') {
 
                 # at end of transaction, expect bulk reply possibly including errors
-                $hd->push_read("AnyEvent::Redis::Protocol" => sub {
+                $hd->push_read("AnyEvent::Redis::Protocol", $self->{_protocol}, sub {
                     my ($res, $err) = @_;
 
                     $self->all_cv->end;
@@ -177,7 +181,7 @@ sub connect {
             } elsif ($self->{multi_write}) {
 
                 # in transaction, expect only "QUEUED"
-                $hd->push_read("AnyEvent::Redis::Protocol" => sub {
+                $hd->push_read("AnyEvent::Redis::Protocol", $self->{_protocol}, sub {
                     my ($res, $err) = @_;
 
                     $self->all_cv->end;
@@ -188,7 +192,7 @@ sub connect {
 
             } elsif ($command !~ /^p?subscribe\z/) {
 
-                $hd->push_read("AnyEvent::Redis::Protocol" => sub {
+                $hd->push_read("AnyEvent::Redis::Protocol", $self->{_protocol}, sub {
                     my ($res, $err) = @_;
 
                     if ($command eq 'info') {
@@ -212,7 +216,7 @@ sub connect {
 
                 my $res_cb; $res_cb = sub {
 
-                    $hd->push_read("AnyEvent::Redis::Protocol" => sub {
+                    $hd->push_read("AnyEvent::Redis::Protocol", $self->{_protocol}, sub {
                         my ($res, $err) = @_;
 
                         if (ref $res) {
