@@ -9,11 +9,12 @@ use AnyEvent;
 use AnyEvent::Handle;
 use AnyEvent::Socket;
 use AnyEvent::Redis::Protocol;
-# This is used by AnyEvent::Redis::Protocol, we leak the implementation though
-# as it needs to be passed this to keep state.
-use Protocol::Redis;
-use Carp qw(croak);
+use Carp ();
 use Encode ();
+
+use constant PROTOCOL_REDIS =>
+  eval { require Protocol::Redis::XS; "Protocol::Redis::XS" }
+    || do { require Protocol::Redis; "Protocol::Redis" };
 
 our $AUTOLOAD;
 
@@ -25,13 +26,18 @@ sub new {
 
     if (my $encoding = $args{encoding}) {
         $args{encoding} = Encode::find_encoding($encoding);
-        croak qq{Encoding "$encoding" not found} unless ref $args{encoding};
+        Carp::croak qq{Encoding "$encoding" not found} unless ref $args{encoding};
     }
 
+    my $protocol = delete $args{protocol} || PROTOCOL_REDIS;
+    $protocol = ref $protocol ? $protocol : $protocol->new;
+    Carp::croak "$class needs Protocol::Redis API version 1 support"
+      unless eval { $protocol->use_api(1) };
+
     bless {
-        host      => $host,
-        port      => $port,
-        _protocol => Protocol::Redis->new,
+        host     => $host,
+        port     => $port,
+        protocol => $protocol,
         %args,
     }, $class;
 }
@@ -104,14 +110,14 @@ sub connect {
 
             # Are we already subscribed to anything?
             if ($self->{sub} && %{$self->{sub}}) {
-                croak "Use of non-pubsub command during pubsub session may result in unexpected behaviour"
+                Carp::croak "Use of non-pubsub command during pubsub session may result in unexpected behaviour"
                   unless $command =~ /^p?(?:un)?subscribe\z/;
             }
             if ($self->{multi_write}) {
-                croak "Use of pubsub or multi command in transaction is not supported"
+                Carp::croak "Use of pubsub or multi command in transaction is not supported"
                   if $command =~ /^p?(?:un)?subscribe\z|^multi\z/;
             } else {
-                croak "Can't 'exec' a transaction because none is pending"
+                Carp::croak "Can't 'exec' a transaction because none is pending"
                   if $command eq 'exec';
             }
 
@@ -157,7 +163,7 @@ sub connect {
             } elsif ($command eq 'exec') {
 
                 # at end of transaction, expect bulk reply possibly including errors
-                $hd->push_read("AnyEvent::Redis::Protocol", $self->{_protocol}, sub {
+                $hd->push_read("AnyEvent::Redis::Protocol", $self->{protocol}, sub {
                     my ($res, $err) = @_;
 
                     $self->all_cv->end;
@@ -181,7 +187,7 @@ sub connect {
             } elsif ($self->{multi_write}) {
 
                 # in transaction, expect only "QUEUED"
-                $hd->push_read("AnyEvent::Redis::Protocol", $self->{_protocol}, sub {
+                $hd->push_read("AnyEvent::Redis::Protocol", $self->{protocol}, sub {
                     my ($res, $err) = @_;
 
                     $self->all_cv->end;
@@ -192,7 +198,7 @@ sub connect {
 
             } elsif ($command !~ /^p?subscribe\z/) {
 
-                $hd->push_read("AnyEvent::Redis::Protocol", $self->{_protocol}, sub {
+                $hd->push_read("AnyEvent::Redis::Protocol", $self->{protocol}, sub {
                     my ($res, $err) = @_;
 
                     if ($command eq 'info') {
@@ -209,14 +215,14 @@ sub connect {
                 $self->{multi_write} = 1 if $command eq 'multi';
 
             } else {
-                croak "Must provide a CODE reference for subscriptions" unless $cb;
+                Carp::croak "Must provide a CODE reference for subscriptions" unless $cb;
 
                 # Remember subscriptions
                 $self->{sub}->{$_} ||= [$cv, $cb] for @_;
 
                 my $res_cb; $res_cb = sub {
 
-                    $hd->push_read("AnyEvent::Redis::Protocol", $self->{_protocol}, sub {
+                    $hd->push_read("AnyEvent::Redis::Protocol", $self->{protocol}, sub {
                         my ($res, $err) = @_;
 
                         if (ref $res) {
@@ -318,7 +324,7 @@ B<Required.>  The hostname or literal address of the server.
 
 =item port => <PORT>
 
-Optional.  The server port.
+Optional.  The server port. (Default is 6379.)
 
 =item encoding => <ENCODING>
 
@@ -332,6 +338,17 @@ Omit if you intend to handle raw binary data with this connection.
 
 Optional.  Callback that will be fired if a connection or database-level error
 occurs.  The error message will be passed to the callback as the sole argument.
+
+=item protocol => <Protocol::Redis>
+
+Optional.  C<AnyEvent::Redis> uses a L<Protocol::Redis> API compatible module
+for parsing; by default it will use L<Protocol::Redis::XS> if available with a
+fallback to L<Protocol::Redis>. If you wish to provide another class name or a
+specific instance you may provide this parameter to override the default.
+
+(This protocol selection interface should be treated as experimental, it may
+change in future versions therefore please let us know if you do make use of
+it.)
 
 =back
 
@@ -471,6 +488,6 @@ Chip Salzenberg
 
 =head1 SEE ALSO
 
-L<Redis>, L<AnyEvent>
+L<Redis>, L<AnyEvent>, L<Protocol::Redis>.
 
 =cut

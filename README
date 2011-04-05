@@ -37,7 +37,7 @@ ESTABLISHING A CONNECTION
         Required. The hostname or literal address of the server.
 
     port => <PORT>
-        Optional. The server port.
+        Optional. The server port. (Default is 6379.)
 
     encoding => <ENCODING>
         Optional. Encode and decode data (when storing and retrieving,
@@ -50,6 +50,17 @@ ESTABLISHING A CONNECTION
         Optional. Callback that will be fired if a connection or
         database-level error occurs. The error message will be passed to the
         callback as the sole argument.
+
+    protocol => <Protocol::Redis>
+        Optional. "AnyEvent::Redis" uses a Protocol::Redis API compatible
+        module for parsing; by default it will use Protocol::Redis::XS if
+        available with a fallback to Protocol::Redis. If you wish to provide
+        another class name or a specific instance you may provide this
+        parameter to override the default.
+
+        (This protocol selection interface should be treated as
+        experimental, it may change in future versions therefore please let
+        us know if you do make use of it.)
 
 METHODS
     All methods supported by your version of Redis should be supported.
@@ -171,5 +182,5 @@ AUTHORS
     Chip Salzenberg
 
 SEE ALSO
-    Redis, AnyEvent
+    Redis, AnyEvent, Protocol::Redis.
 

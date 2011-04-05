@@ -1,8 +1,6 @@
 package AnyEvent::Redis::Protocol;
-
 use strict;
 use warnings;
-use Protocol::Redis;
 
 =head1 NAME
 
@@ -11,33 +9,32 @@ AnyEvent::Redis::Protocol - Redis response adapter (read handler) for AnyEvent
 =head1 DESCRIPTION
 
 This package should not be directly used.  It provides an AnyEvent read handler
-capable of parsing Redis responses.
+capable of parsing Redis responses using L<Protocol::Redis> underneath.
 
 =head1 SEE ALSO
 
 L<AnyEvent::Handle>, L<Protocol::Redis>,
-Redis Protocol Specification L<http://redis.io/topics/protocol>
+L<Redis Protocol Specification|http://redis.io/topics/protocol>
 
 =cut
 
 sub anyevent_read_type {
     my ($handle, $cb, $p_r) = @_;
-
     my $rbuf = \$handle->{rbuf};
 
     return sub {
-        return () unless defined $$rbuf;
+        return unless defined $$rbuf;
 
         my $input = substr $$rbuf, 0, length($$rbuf), "";
         $p_r->parse($input) if length $input;
 
-        if (my $msg = $p_r->get_message) {
-            my $is_error = $msg->{type} eq '-';
-            $cb->(_remove_type($handle, $msg->{data}), $is_error);
+        if(my $message = $p_r->get_message) {
+            my $is_error = $message->{type} eq '-';
+            $cb->(_remove_type($handle, $message->{data}), $is_error);
             return 1;
         }
 
-        ()
+        return;
     }
 }
 
@@ -86,4 +83,4 @@ See http://dev.perl.org/licenses/ for more information.
 
 __END__
 
-# vim:syn=perl:ts=4:sw=4:et:ai
+# ex:sw=4:et:

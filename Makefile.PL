@@ -4,6 +4,7 @@ all_from 'lib/AnyEvent/Redis.pm';
 readme_from 'lib/AnyEvent/Redis.pm';
 requires 'AnyEvent';
 requires 'Protocol::Redis';
+recommends 'Protocol::Redis::XS';
 build_requires 'Test::More';
 test_requires 'Test::TCP',  1.03;
 author_tests('xt');
