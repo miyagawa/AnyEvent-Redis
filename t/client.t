@@ -2,12 +2,16 @@ use strict;
 use Test::More;
 use t::Redis;
 
+diag "\nAnyEvent::Redis " . AnyEvent::Redis->VERSION . " running on perl " . $^V;
+
 test_redis {
     my $r = shift;
+    diag "Using " . ref($r->{protocol}) . " " . $r->{protocol}->VERSION;
 
     $r->all_cv->begin(sub { $_[0]->send });
 
     my $info = $r->info->recv;
+    eval { diag "Testing against Redis $info->{redis_version}" };
     is ref $info, 'HASH';
     ok $info->{redis_version};
 
