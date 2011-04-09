@@ -2,7 +2,7 @@ package AnyEvent::Redis;
 
 use strict;
 use 5.008_001;
-our $VERSION = '0.2301';
+our $VERSION = '0.2302';
 
 use constant DEBUG => $ENV{ANYEVENT_REDIS_DEBUG};
 use AnyEvent;
@@ -142,11 +142,11 @@ sub connect {
 
             warn $send if DEBUG;
 
-            $hd->push_write($send);
-
             # pubsub is very different - get it out of the way first
 
             if ($is_pubsub) {
+
+                $hd->push_write($send);
 
                 my $already = $self->{sub} && %{$self->{sub}};
 
@@ -213,6 +213,8 @@ sub connect {
 
             $self->all_cv->begin;
             push @{$self->{pending_cvs}}, $cv;
+
+            $hd->push_write($send);
 
             if ($command eq 'exec') {
 
