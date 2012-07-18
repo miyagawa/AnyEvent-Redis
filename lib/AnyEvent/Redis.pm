@@ -252,8 +252,9 @@ sub connect {
             return $cv;
         };
 
-        for my $queue (@{$self->{connect_queue} || []}) {
-            my($cv, @args) = @$queue;
+        my $queue = delete $self->{connect_queue} || [];
+        for my $command (@$queue) {
+            my($cv, @args) = @$command;
             $self->{cmd_cb}->(@args, $cv);
         }
 
