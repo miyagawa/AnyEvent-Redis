@@ -30,9 +30,9 @@ sub new {
     }
 
     my $protocol = delete $args{protocol} || PROTOCOL_REDIS;
-    $protocol = ref $protocol ? $protocol : $protocol->new;
+    $protocol = ref $protocol ? $protocol : $protocol->new(api => 1);
     Carp::croak "$class needs Protocol::Redis API version 1 support"
-      unless eval { $protocol->use_api(1) };
+      unless $protocol;
 
     bless {
         host     => $host,
