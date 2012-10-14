@@ -9,6 +9,7 @@ SYNOPSIS
           port => 6379,
           encoding => 'utf8',
           on_error => sub { warn @_ },
+          on_cleanup => sub { warn "Connection closed: @_" },
       );
 
       # callback based
@@ -51,6 +52,12 @@ ESTABLISHING A CONNECTION
         database-level error occurs. The error message will be passed to the
         callback as the sole argument.
 
+    on_cleanup => $cb->($errmsg)
+        Optional. Callback that will be fired if a connection error occurs.
+        The error message will be passed to the callback as the sole
+        argument. After this callback, errors will be reported for all
+        outstanding requests.
+
 METHODS
     All methods supported by your version of Redis should be supported.
 
@@ -73,8 +80,8 @@ METHODS
 
           # or...
           $cv->cb(sub {
-            my($cv) = @_;
-            my($result, $err) = $cv->recv
+            my ($cv) = @_;
+            my ($result, $err) = $cv->recv
           });
 
     *   Callback:
@@ -82,24 +89,28 @@ METHODS
           $redis->command(
             # arguments,
             sub {
-              my($result, $err) = @_;
+              my ($result, $err) = @_;
             });
 
         (Callback is a wrapper around the $cv approach.)
 
   Transactions (MULTI/EXEC)
     Redis transactions begin with a "multi" command and end with an "exec"
-    command. Commands issued in between are not executed immediately; on
-    receipt of the "exec", the server executes all commands atomically, and
-    returns all the results as one bulk reply. Therefore, by the time any of
-    these callbacks is called, the entire transaction is finished for better
-    or worse.
+    command. Commands in between are not executed immediately when they're
+    sent. On receipt of the "exec", the server executes all the saved
+    commands atomically, and returns all their results as one bulk reply.
 
     After a transaction is finished, results for each individual command are
-    reported in the usual way. Results of the "exec" itself will be returned
-    as an array reference containing all of the individual results. This may
-    in some cases make callbacks on the individual commands unnecessary, or
-    vice versa.
+    reported in the usual way. Thus, by the time any of these callbacks is
+    called, the entire transaction is finished for better or worse.
+
+    Results of the "exec" (containing all the other results) will be
+    returned as an array reference containing all of the individual results.
+    This may in some cases make callbacks on the individual commands
+    unnecessary, or vice versa. In this bulk reply, errors reported for each
+    individual command are represented by objects of class
+    "AnyEvent::Redis::Error", which will respond to a "->message" method
+    call with that error message.
 
     It is not permitted to nest transactions. This module does not permit
     subscription-related commands in a transaction.
@@ -109,7 +120,7 @@ METHODS
     with a callback:
 
       my $cv = $redis->subscribe("test", sub {
-        my($message, $channel[, $actual_channel]) = @_;
+        my ($message, $channel[, $actual_channel]) = @_;
         # ($actual_channel is provided for pattern subscriptions.)
       });
 
