@@ -2,7 +2,7 @@ package AnyEvent::Redis;
 
 use strict;
 use 5.008_001;
-our $VERSION = '0.2302';
+our $VERSION = '0.24';
 
 use constant DEBUG => $ENV{ANYEVENT_REDIS_DEBUG};
 use AnyEvent;
@@ -11,6 +11,7 @@ use AnyEvent::Socket;
 use AnyEvent::Redis::Protocol;
 use Carp qw( croak confess );
 use Encode ();
+use Scalar::Util qw(weaken);
 
 our $AUTOLOAD;
 
@@ -81,6 +82,7 @@ sub connect {
     }
 
     return $cv if $self->{sock};
+    weaken $self;
 
     $self->{sock} = tcp_connect $self->{host}, $self->{port}, sub {
         my $fh = shift
@@ -109,6 +111,7 @@ sub connect {
             my $command = lc shift;
             my $is_pubsub    = $command =~ /^p?(?:un)?subscribe\z/;
             my $is_subscribe = $command =~ /^p?subscribe\z/;
+
 
             # Are we already subscribed to anything?
             if ($self->{sub} && %{$self->{sub}}) {
@@ -141,6 +144,13 @@ sub connect {
                 . "\r\n";
 
             warn $send if DEBUG;
+
+            # $self is weakened to avoid leaks, hold on to a strong copy
+            # controlled via a CV.
+            my $cmd_cv = AE::cv;
+            $cmd_cv->cb(sub {
+                my $strong_self = $self;
+              });
 
             # pubsub is very different - get it out of the way first
 
@@ -178,6 +188,7 @@ sub connect {
                                     warn "Exception in callback (ignored): $@" if $@;
                                     delete $self->{sub}->{$res->[1]};
                                     $self->all_cv->end;
+                                    $cmd_cv->send;
 
                                 } else {
                                     warn "Unknown pubsub action: $action";
@@ -246,6 +257,7 @@ sub connect {
                     }
 
                     $self->all_cv->end;
+                    $cmd_cv->send;
                 });
 
                 delete $self->{multi_write};
@@ -267,6 +279,7 @@ sub connect {
                     }
 
                     $self->all_cv->end;
+                    $cmd_cv->send;
                 });
 
             } else {
@@ -287,6 +300,7 @@ sub connect {
                     warn "Exception in callback (ignored): $@" if $@;
 
                     $self->all_cv->end;
+                    $cmd_cv->send;
                 });
 
                 $self->{multi_write} = 1 if $command eq 'multi';
