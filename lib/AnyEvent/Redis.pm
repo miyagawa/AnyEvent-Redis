@@ -290,7 +290,7 @@ sub connect {
                     $self->_expect($cv);
 
                     if ($command eq 'info') {
-                        $res = { map { split /:/, $_, 2 } split /\r\n/, $res };
+                        $res = { map { split /:/, $_, 2 } grep !/^#/, split /\r\n/, $res };
                     } elsif ($command eq 'keys' && !ref $res) {
                         # Older versions of Redis (1.2) need this
                         $res = [split / /, $res];
