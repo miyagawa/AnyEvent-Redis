@@ -1,5 +1,11 @@
 Revision history for Perl extension AnyEvent::Redis
 
+0.24  Wed 12 Dec 16:18:42 GMT 2012
+         - Many error handling improvements (chip)
+         - Reconnect logic (leedo)
+         - Fix for tests with redis-server 2.6 (typester)
+         - Fix leak of connections (dgl)
+
 0.23  Wed 12 Jan 2011 23:34:58 GMT
          - Fix to always allow condvar as final param (chip)
 

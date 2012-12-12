@@ -3,6 +3,7 @@
 \.svn/
 \.git/
 ^MANIFEST\.
+^MYMETA\.(yml|json)$
 ^Makefile$
 ~$
 \.old$
@@ -12,3 +13,4 @@
 \.gz$
 \.cvsignore
 \.shipit
+^dump\.rdb
